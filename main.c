@@ -126,7 +126,7 @@ int main(int argc, char* argv[]){
   //supports up to 100... if the ROM library is huge
   fgets(num, 3, stdin);
 
-  printf("You selected %s\n\n", roms[atoi(num)]);
+  printf("\nYou selected %s\n\n", roms[atoi(num)]);
 
   //
   printf("Initializing... \n\n");
@@ -136,13 +136,15 @@ int main(int argc, char* argv[]){
   //
   printf("Ready!\n\n");
 
-/*
+
 
   //GLFW Example code below
+  /*
   if (!glfwInit()){
     return -1;
   }
   */
+
 
 
   /*
