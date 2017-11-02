@@ -41,6 +41,12 @@
 Libretro API struct
 
 See libretro.h for more information on what the functions do
+
+ "Function pointers are useful for passing functions as parameters to other functions.
+ ... So basically, it gives C pseudo first-class functionality."
+
+ OOP
+
 */
 static struct {
 
@@ -78,10 +84,6 @@ Dynamically read
 //Arrays to hold a list of stuff in a directory
 char* roms[100];
 char* cores[10];
-
-//File pointer array
-FILE *romFile[100];
-FILE *coreFile[100];
 
 /*
 scanRoms()
@@ -164,7 +166,7 @@ void scanCores(){
          cores[count] = dir->d_name;
 
          //Print name
-         printf("[%d] %s \n", count, dir->d_name);
+         printf("[%d] %s \n\n", count, dir->d_name);
 
          count++;
 
@@ -176,71 +178,157 @@ void scanCores(){
 }
 
 /*
+core_environment()
+
+The section of the adapter to make environment callbacks
+
+See around line 450 of the libretro.h file
 
 */
-static void loadGame(const char *rom) {
+static bool core_environment(unsigned command, void *data) {
 
-}
+  switch(command){
 
-/*
-
-*/
-static bool core_environment(unsigned cmd, void *data) {
+    case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+    case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
+        *(const char **)data = ".";
+        return true;
+  }
 
 	return true;
 
 }
 
+/*
+inputPoll()
+*/
+static void inputPoll(){
+
+  //Send inputs?
+
+}
 
 /*
+inputState()
+
+MATCH THIS :
+
+typedef int16_t (RETRO_CALLCONV *retro_input_state_t)(unsigned port, unsigned device,
+      unsigned index, unsigned id);
+
+*/
+static int16_t inputState(unsigned port, unsigned device, unsigned index, unsigned id){
+  return 0;
+}
+
+/*
+loadCore()
+
+Handles the necessary linking and callback
+
+print fuctions were for finding out when segmentation fault occurred.
 
 */
 static void loadCore(const char *sofile) {
 
-	void (*set_environment)(retro_environment_t) = NULL;
+ //Get things nice and ready
+ void (*set_environment)(retro_environment_t) = NULL;
 
-	memset(&api, 0, sizeof(api));
+ //input poll and state are a pair; otherwise seg fault 11
+ void (*get_input)(retro_input_poll_t) = NULL;
+ void (*get_state)(retro_input_state_t) = NULL;
 
-	api.pointer = dlopen(sofile, RTLD_LAZY);
+  //printf("two\n" );
 
+ memset(&api, 0, sizeof(api));
+
+  //printf("thre\n" );
+
+  //resolve symbols lazily
+  api.pointer = dlopen(sofile, RTLD_LAZY);
+
+ //printf("four\n" );
 	if (!api.pointer){
-		//printf("Failed to load core: %s", dlerror());
     printf("Failed to initialize libretro\n");
 
 	  dlerror();
   }
 
-  //Access the required API function from the library
-  retro_link(retro_api_version);
-	retro_link(retro_init);
-	retro_link(retro_get_system_info);
-	retro_link(retro_reset);
-	retro_link(retro_load_game);
-	retro_link(retro_unload_game);
-	retro_link(retro_run);
-	retro_link(retro_deinit);
+  //
+  retro_link(retro_init);
 
+  //links: RETRO_API void retro_set_environment(retro_environment_t);
+  link(set_environment, retro_set_environment);
+
+  printf("five\n" );
+
+  //links: RETRO_API void retro_set_input_poll(retro_input_poll_t);
+  link(get_input, retro_set_input_poll);
+
+  //links: RETRO_API void retro_set_input_state(retro_input_state_t);
+  link(get_state, retro_set_input_state);
+
+  printf("six\n" );
 
 	set_environment(core_environment);
+
+  printf("seven\n" );
+
+  get_input(inputPoll);
+
+  printf("eight \n");
+
+  get_state(inputState);
+
+  printf("nine \n");
 
   //Libretro library initialize
   api.retro_init();
 
+  printf("ten \n");
+
   //Core is ready
 	api.ready = true;
 
-	printf("Core loaded");
+	printf("Core loaded \n\n");
+
+}
+
+/*
+loadGame()
+
+Loads the game
+
+Define a struct for :
+
+  RETRO_API bool retro_load_game(const struct retro_game_info *game);
+
+*/
+static void loadGame(const char *rom) {
+
+  //Declaring the parameter the Libretro API wants
+  struct retro_game_info gameInfo;
+
+  //Read a non-text file, that is our ROM
+  FILE *game = fopen(rom, "rb");
+
+  //No ROM
+  if (!game){
+    printf("Mission failed, we'll get em next time. \n\n");
+  }
+  else{
+    printf("Are we rushin in, or are we going in sneaky beaky like? (Game file found) \n\n");
+
+    //
+    return;
+
+  }
 
 }
 
 
 /*
-
 main()
-
-format for running the program from command line:
-
-    "main ROMname coreName"
 
 Argc stores number of command-line arguments, with name of program counting as one
 
@@ -276,11 +364,20 @@ int main(int argc, char* argv[]){
   printf("Initializing... \n\n");
 
   //PASS IN the dylib file
-  loadCore();// cores[atoi(num)] );
+  //printf("./cores/%s/libretro/quicknes_libretro.dylib", cores[atoi(num)]);
+
+  loadCore("./cores/quickNES/libretro/quicknes_libretro.dylib");
+  //loadCore( cores[atoi(num)] );
 
   printf("Ready!\n\n");
 
-	loadGame( roms[atoi(num)] );
+	//loadGame( roms[atoi(num)] );
+  loadGame("./ROMS/Super Mario Bros.nes"); //hard coding master
 
+  /*
+  segfault on retro_run... but why?
+    probably need to implement the rest of the set functions
+  */
+  api.retro_run();
 
 }
