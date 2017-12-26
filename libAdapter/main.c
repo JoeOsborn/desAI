@@ -43,6 +43,9 @@
 char* roms[100];
 char* cores[10];
 
+//Each index corresponds to a button
+uint16_t controls[16];
+
 /*
 Libretro API struct
 
@@ -82,32 +85,9 @@ static struct {
 
 } api;
 
-//Controller message structs
-struct {
 
-  int port;
-  int device;
-  int index;
-  int id;
-  int state;
 
-} ctrler;
-
-/*
-  Input descriptor from the bnes_libretro core(?)
-*/
-struct retro_input_descriptor desc[] = {
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "B" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "A" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,   "Select" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" }
-};
-
-int toggle = 0;
+//int toggle = 0;
 
 /*
 Dynamically read
@@ -118,51 +98,6 @@ Dynamically read
 	} while (0)
 #define retro_link(S) link(api.S, S)
 
-/*
-scanRoms()
-Looks in ROMS directory and returns the files in it. (If any)
-
-void scanRoms(){
-
-    //
-    DIR *currDir;
-    struct dirent *dir;
-    struct stat statbuf;
-
-    currDir = opendir("./ROMS");
-
-    //
-    int count = 0;
-
-    if (currDir){
-
-      while ((dir = readdir(currDir)) != NULL) {
-
-        //lstat() gets a link to the file
-        lstat(dir->d_name,&statbuf);
-
-        //If the files are any of these
-        if(strcmp(".",dir->d_name) == 0 || strcmp("..",dir->d_name) == 0 || strcmp(".DS_Store",dir->d_name) == 0){
-               //Nothing to print here, move onto next interation without finishing below
-               continue;
-         }
-
-         //Add the file to array
-         roms[count] = dir->d_name;
-
-         //Print name
-         printf("[%d] %s \n", count, dir->d_name);
-
-         //
-         count++;
-
-      }
-
-      closedir(currDir);
-    }
-
-}
-*/
 
 /*
 core_environment()
@@ -190,8 +125,6 @@ bool core_environment(unsigned command, void *data) {
 inputPoll()
 */
 void inputPoll(){
-
-
 }
 
 /*
@@ -202,16 +135,36 @@ MATCH THIS :
   typedef int16_t (RETRO_CALLCONV *retro_input_state_t)(unsigned port, unsigned device,
         unsigned index, unsigned id);
 
+
+    #define RETRO_DEVICE_ID_JOYPAD_B        0
+    #define RETRO_DEVICE_ID_JOYPAD_Y        1
+    #define RETRO_DEVICE_ID_JOYPAD_SELECT   2
+    #define RETRO_DEVICE_ID_JOYPAD_START    3
+    #define RETRO_DEVICE_ID_JOYPAD_UP       4
+    #define RETRO_DEVICE_ID_JOYPAD_DOWN     5
+    #define RETRO_DEVICE_ID_JOYPAD_LEFT     6
+    #define RETRO_DEVICE_ID_JOYPAD_RIGHT    7
+    #define RETRO_DEVICE_ID_JOYPAD_A        8
+    #define RETRO_DEVICE_ID_JOYPAD_X        9
+    #define RETRO_DEVICE_ID_JOYPAD_L       10
+    #define RETRO_DEVICE_ID_JOYPAD_R       11
+    #define RETRO_DEVICE_ID_JOYPAD_L2      12
+    #define RETRO_DEVICE_ID_JOYPAD_R2      13
+    #define RETRO_DEVICE_ID_JOYPAD_L3      14
+    #define RETRO_DEVICE_ID_JOYPAD_R3      15
+
 */
 int16_t inputState(unsigned port, unsigned device, unsigned index, unsigned id){
 
-  printf("port: %u\n", port);
-  printf("index: %u\n", index);
-  printf("device: %u\n", device);
-  printf("id: %u\n", id);
+  int randIn = rand()%8;
 
-  if(id == 0) { return toggle; }
-  if(id == 3) { return !toggle; }
+  printf("%d\n", randIn);
+
+  if(id == randIn) {
+    return 1;
+  }
+
+
   return 0;
 
   //array of ints/bools take input specs from controller
@@ -481,10 +434,6 @@ void loadCore(const char *sofile) {
 
   retro_video(refreshVid);
 
-  //controller stuff
-  //api.retro_set_controller_port_device(0,1);
-  core_environment(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
-
   //Libretro library initialize
   api.retro_init();
 
@@ -604,12 +553,13 @@ int main(int argc, char* argv[]){
 
     api.retro_run();
 
+    for (int i=0; i<16; i++){
+      controls[i] = (rand() % 1);
+    }
+
     count++;
 
-    if (count%10==0){
-      toggle=!toggle;
-      printf("                                        toggle: %d\n",toggle);
-    }
+
   }
 
   //api.retro_deinit();
@@ -656,6 +606,52 @@ void scanCores(){
          //Print name
          printf("[%d] %s \n\n", count, dir->d_name);
 
+         count++;
+
+      }
+
+      closedir(currDir);
+    }
+
+}
+*/
+
+/*
+scanRoms()
+Looks in ROMS directory and returns the files in it. (If any)
+
+void scanRoms(){
+
+    //
+    DIR *currDir;
+    struct dirent *dir;
+    struct stat statbuf;
+
+    currDir = opendir("./ROMS");
+
+    //
+    int count = 0;
+
+    if (currDir){
+
+      while ((dir = readdir(currDir)) != NULL) {
+
+        //lstat() gets a link to the file
+        lstat(dir->d_name,&statbuf);
+
+        //If the files are any of these
+        if(strcmp(".",dir->d_name) == 0 || strcmp("..",dir->d_name) == 0 || strcmp(".DS_Store",dir->d_name) == 0){
+               //Nothing to print here, move onto next interation without finishing below
+               continue;
+         }
+
+         //Add the file to array
+         roms[count] = dir->d_name;
+
+         //Print name
+         printf("[%d] %s \n", count, dir->d_name);
+
+         //
          count++;
 
       }
