@@ -39,6 +39,9 @@
 #include "bmpfile.h"
 #include "libretro.h"
 
+//Arrays to hold a list of stuff in a directory
+char* roms[100];
+char* cores[10];
 
 /*
 Libretro API struct
@@ -114,10 +117,6 @@ Dynamically read
 	   printf("API function failedddd '" #S "'': %s", dlerror()); \
 	} while (0)
 #define retro_link(S) link(api.S, S)
-
-//Arrays to hold a list of stuff in a directory
-char* roms[100];
-char* cores[10];
 
 /*
 scanRoms()
