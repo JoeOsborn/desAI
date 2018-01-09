@@ -29,8 +29,8 @@
 
 //Native headers used
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <dirent.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -508,6 +508,9 @@ Argv stores name of program at argv[0], and then proceeding indices are argument
 */
 int main(int argc, char* argv[]){
 
+  //clean image output folder
+  remove("./images/");
+
   int count = 0;
   int frames = 300;
 
@@ -554,7 +557,7 @@ int main(int argc, char* argv[]){
     api.retro_run();
 
     for (int i=0; i<16; i++){
-      controls[i] = (rand() % 1);
+      controls[i] = (rand() % 2);
     }
 
     count++;

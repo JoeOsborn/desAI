@@ -1,3 +1,7 @@
 ROMS/
 cores/
 cenv/
+a.out
+main.dSYM/
+cenv/
+images/
