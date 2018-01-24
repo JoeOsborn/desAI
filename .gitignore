@@ -5,3 +5,7 @@ a.out
 main.dSYM/
 cenv/
 images/
+/libAdapter/GPATH
+/libAdapter/GRTAGS
+/libAdapter/GTAGS
+.mypy_cache/
