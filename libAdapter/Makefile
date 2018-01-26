@@ -1,13 +1,13 @@
-CPP=clang++
-CPPFLAGS=-I. -std=c++11 -g -fsanitize=address -fsanitize=undefined 
+CXX=clang++
+CXXFLAGS=-I. -std=c++11 -g -fsanitize=address -fsanitize=undefined -mmacosx-version-min=10.12
 DEPS = libretro.h 
 OBJ = main.o
 
 %.o: %.cpp $(DEPS)
-	$(CPP) -c -o $@ $< $(CPPFLAGS)
+	$(CXX) -c -o $@ $< $(CXXFLAGS)
 
 driver: $(OBJ)
-	$(CPP) -o $@ $^ $(CPPFLAGS)
+	$(CXX) -o $@ $^ $(CXXFLAGS)
 
 .PHONY: clean
 

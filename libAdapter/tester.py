@@ -26,6 +26,7 @@ def dump_ppm(buf, fl):
 mario_controls = driver.read_fm2('Illustrative.fm2')
 
 remo = Driver("./driver", "../cores/bnes-libretro/bnes_libretro.dylib", "mario.nes")
+#remo = Driver("./driver", "../cores/nestopia/libretro/nestopia_libretro.dylib", "mario.nes")
 
 startup = 500
 results = remo.step([mario_controls[0][:startup]], Infos(framebuffer=False))

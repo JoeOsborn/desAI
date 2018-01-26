@@ -4,8 +4,6 @@
 
   An adapter (front end) for libretro
 
-  Program Outline TODO:
-
   The server sends a byte as a "prompt" to say it's ready; let's say it sends 0.
   The client sends a message like this:
   Command ID, ...
@@ -14,16 +12,6 @@
   a. Step the emulator, collecting these informations, expecting this many players and this many inputs, and here are the inputs; (number of bytes per player input will be different for different consoles)
   b. Save a state
   c. Load a state, here it is
-
-  TODO:
-
-  Make scanRoms() and scanCores() flexible
-
-  Python extracting information.
-
-  Impose a grid over the screen the of the game
-
-  Knowing what parts of the screen is scrolling and what sprites are moving
 
 */
 
@@ -97,6 +85,8 @@ static struct {
 
 } api;
 
+const char *dir = "./";
+enum retro_pixel_format pixfmt = RETRO_PIXEL_FORMAT_0RGB1555;
 
 
 //int toggle = 0;
@@ -146,6 +136,8 @@ void inputPoll(){
 //Each index corresponds to a button
 uint16_t controls[2][16];
 int16_t inputState(unsigned port, unsigned device, unsigned index, unsigned id){
+  //std::cerr << "P:"<<port<<",D:"<<device<<",I:"<<index<<+",ID:"<<id<<"\n";
+  if(port >= 2) { return 0; }
   assert(port < 2);
   assert(index == 0);
   assert(device == 1);
@@ -175,32 +167,52 @@ void refreshVid(const void *data, unsigned width, unsigned height, size_t pitch)
   assert(fbWidth == width);
   assert(fbHeight == height);
 
+  assert(pixfmt != RETRO_PIXEL_FORMAT_UNKNOWN);
   //stuff happens
   if(data){
-    // TODO: handle different pitch
     uint16_t *shorts = (uint16_t *)data;
+    uint32_t *longs = (uint32_t *)data;
+    uint16_t pixel16=0;
+    uint8_t red=0,green=0,blue=0;
     for (uint16_t j=0; j < height; j++){
       for (uint16_t i=0; i < width; i++){
-        uint16_t pixel = shorts[i+j*width];
-        /*red, green, blue are between 0 and 2^6; scale them up to 0..2^8
+        switch(pixfmt) {
+        case RETRO_PIXEL_FORMAT_0RGB1555:
+          /*red, green, blue are between 0 and 2^6; scale them up to 0..2^8
 
-          - n bits yield 2^n patterns
-          - 0b just denotes the numbers on the right of it is a binary literal, or base two number
-          - remember an n bit is for the alpha but we are only currently looking at RGB
-          111110000000000
-          1) 11111 is shifted left by 10 == 111110000000000 or 31744 (decimal)
-          2) pixel value (1585560) or (110000011000110011000 in binary) AND  31744 occurs == 12288 (decimal)
-          3) multiply 12288 (11000000000000 in binary) by 8 (1000) == 98304
-          4) bitwise shift right by 10 == 96
+            - n bits yield 2^n patterns
+            - 0b just denotes the numbers on the right of it is a binary literal, or base two number
+            - remember an n bit is for the alpha but we are only currently looking at RGB
+            111110000000000
+            1) 11111 is shifted left by 10 == 111110000000000 or 31744 (decimal)
+            2) pixel value (1585560) or (110000011000110011000 in binary) AND  31744 occurs == 12288 (decimal)
+            3) multiply 12288 (11000000000000 in binary) by 8 (1000) == 98304
+            4) bitwise shift right by 10 == 96
 
-          so to shift to 2^8 that's like two more bits needed for shifts
-        */
-
-        //120 120 120
-        uint8_t red = 8*(pixel & (0b11111 << 10)) >> 10;
-        uint8_t green = 8*(pixel & (0b11111 << 5)) >> 5;
-        uint8_t blue = 8*(pixel & (0b11111));
-        fb[i+j*width] = (uint32_t)(0xFF << 24 | red << 16 | green << 8 | blue);
+            so to shift to 2^8 that's like two more bits needed for shifts
+          */
+          pixel16 = shorts[i+j*width];
+          //120 120 120
+          red = 8*(pixel16 & (0b11111 << 10)) >> 10;
+          green = 8*(pixel16 & (0b11111 << 5)) >> 5;
+          blue = 8*(pixel16 & (0b11111));
+          fb[i+j*width] = (uint32_t)(0xFF << 24 | red << 16 | green << 8 | blue);
+          break;
+        case RETRO_PIXEL_FORMAT_RGB565:
+          pixel16 = shorts[i+j*width];
+          //120 120 120
+          red = 8*(pixel16 & (0b11111 << 11)) >> 11;
+          green = 16*(pixel16 & (0b111111 << 5)) >> 5;
+          blue = 8*(pixel16 & (0b11111));
+          fb[i+j*width] = (uint32_t)(0xFF << 24 | red << 16 | green << 8 | blue);
+          break;
+        case RETRO_PIXEL_FORMAT_XRGB8888:
+          //TODO: replace loop with a memcpy in this case
+          fb[i+j*width] = longs[i+j*width];
+          break;
+        default:
+          assert(false);
+        }
       }
     }
   }
@@ -233,7 +245,23 @@ size_t audioBatch(const int16_t *data, size_t frames){
 
 bool core_environment(unsigned command, void *data) {
   std::cerr<<"ENV "<<command<<"\n";
-	return true;
+  //TODO: implement RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, RETRO_ENVIRONMENT_{GET|SET}_VARIABLE using struct retro_variable
+  switch(command) {
+  case RETRO_ENVIRONMENT_GET_LOG_INTERFACE:
+    *(void**)data = NULL;
+    return true;
+  case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
+  case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+    *(const char**)data = dir;
+    return true;
+  case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
+    pixfmt = *(const enum retro_pixel_format *)data;
+    std::cerr<<"pixfmt:"<<pixfmt<<"\n";
+    return true;
+  default:
+    std::cerr<<"UNHANDLED\n";
+    return false;
+  }
 }
 
 
