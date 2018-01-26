@@ -126,7 +126,7 @@ class Driver(object):
                  "framebuffer_height", "framebuffer_width", "framebuffer_depth")
     # TODO: type the above
 
-    def __init__(self, driver, corefile, romfile, num_players=1, bytes_per_player=2, framebuffer_height=256, framebuffer_width=240, framebuffer_depth=4):
+    def __init__(self, driver, corefile, romfile, num_players=1, bytes_per_player=2, framebuffer_height=240, framebuffer_width=256, framebuffer_depth=4):
         # type: (str, str, int, int, int, int, int) -> None
         self.driver = driver
         self.core = corefile
@@ -139,8 +139,8 @@ class Driver(object):
         self.framebuffer_width = framebuffer_width
         self.framebuffer_depth = framebuffer_depth
         self.framebuffer_length = self.framebuffer_height * self.framebuffer_width * self.framebuffer_depth
-        assert self.framebuffer_height == 256
-        assert self.framebuffer_width == 240
+        assert self.framebuffer_height == 240
+        assert self.framebuffer_width == 256
         assert self.framebuffer_depth == 4
         self.process = subprocess.Popen([self.driver, self.core, self.rom],
                                         stdin=subprocess.PIPE,

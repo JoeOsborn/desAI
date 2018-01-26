@@ -12,7 +12,7 @@ import driver
 
 
 def dump_ppm(buf, fl):
-    header = bytearray(b"P6\n {} {}\n 255\n".format(buf.shape[0], buf.shape[1]))
+    header = bytearray(b"P6\n {} {}\n 255\n".format(buf.shape[1], buf.shape[0]))
     ppmfile = open(fl, 'wb')
     ppmfile.write(header)
 
