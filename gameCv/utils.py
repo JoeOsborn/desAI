@@ -26,7 +26,7 @@ def plot_colors(hist, centroids):
 	# loop over the percentage of each cluster and the color of
 	# each cluster
 	for (percent, color) in zip(hist, centroids):
-		
+
 		# plot the relative percentage of each cluster
 		endX = startX + (percent * 300)
 		cv2.rectangle(bar, (int(startX), 0), (int(endX), 50),
