@@ -95,8 +95,6 @@ for rgbVal in foundRGBColors:
 
     res = cv2.bitwise_and(image2,image2, mask= mask)
 
-    cv2.imshow('image2', image2)
-    cv2.imshow('mask', mask)
     cv2.imshow('res', res)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
