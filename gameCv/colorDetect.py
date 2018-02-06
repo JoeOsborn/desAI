@@ -90,10 +90,26 @@ for rgbVal in foundRGBColors:
     thisHSV = RGB_2_HSV( rgbVal )
     print(thisHSV)
 
+	"""
+
+    #convert RGB to HSV
+    h,s,v = colorsys.rgb_to_hsv(rgbVal[0]/255., rgbVal[1]/255., rgbVal[2]/255.)
+    newHSV = (360 * h, 100 * s, 100 * v)
+
+    print(newHSV)
+	
+	"""
+
+    #convert RGB to HSV
+    h,s,v = colorsys.rgb_to_hsv(rgbVal[0]/255., rgbVal[1]/255., rgbVal[2]/255.)
+    newHSV = (360 * h, 100 * s, 100 * v)
+
+    print(newHSV)
+
     #apply a mask that will only seek out this one color in the image
     mask = cv2.inRange(hsv, (thisHSV[0]-10, 100, 100), (thisHSV[1]+10, 255, 255))
 
-    res = cv2.bitwise_and(image2,image2, mask= mask)
+    res = cv2.bitwise_and(hsv,hsv, mask= mask)
 
     cv2.imshow('res', res)
     cv2.waitKey(0)
