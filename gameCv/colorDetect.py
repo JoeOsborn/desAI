@@ -1,44 +1,10 @@
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 import utils
 import cv2
 import colorsys
-
-#https://stackoverflow.com/questions/24152553/hsv-to-rgb-and-back-without-floating-point-math-in-python
-def RGB_2_HSV(RGB):
-	#Converts an integer RGB tuple (value range from 0 to 255) to an HSV tuple
-
-	# Unpack the tuple for readability
-	R, G, B = RGB
-
-	# Compute the H value by finding the maximum of the RGB values
-	RGB_Max = max(RGB)
-	RGB_Min = min(RGB)
-
-	# Compute the value
-	V = RGB_Max;
-	if V == 0:
-	    H = S = 0
-	    return (H,S,V)
-
-
-	# Compute the saturation value
-	S = 255 * (RGB_Max - RGB_Min) // V
-
-	if S == 0:
-	    H = 0
-	    return (H, S, V)
-
-	# Compute the Hue
-	if RGB_Max == R:
-	    H = 0 + 43*(G - B)//(RGB_Max - RGB_Min)
-	elif RGB_Max == G:
-	    H = 85 + 43*(B - R)//(RGB_Max - RGB_Min)
-	else: # RGB_MAX == B
-	    H = 171 + 43*(R - G)//(RGB_Max - RGB_Min)
-
-	return (H, S, V)
 
 #
 foundRGBColors = []
@@ -65,7 +31,10 @@ clt.fit(image)
 hist = utils.centroid_histogram(clt)
 bar = utils.plot_colors(hist, clt.cluster_centers_)
 
-
+plt.figure()
+plt.axis("off")
+plt.imshow(bar)
+plt.show()
 
 #
 # Go through the colors and blob detect
@@ -73,11 +42,11 @@ bar = utils.plot_colors(hist, clt.cluster_centers_)
 #
 for datcolor in zip(clt.cluster_centers_):
 
-    #for tuple in datcolor[0]:
+	#for tuple in datcolor[0]:
 
-    actualTuple = ( int(round(datcolor[0][0])), int(round(datcolor[0][1])), int(round(datcolor[0][2])) )
+	actualTuple = ( int(round(datcolor[0][0])), int(round(datcolor[0][1])), int(round(datcolor[0][2])) )
 
-    foundRGBColors.append(actualTuple)
+	foundRGBColors.append(actualTuple)
 
 print(foundRGBColors)
 
@@ -86,31 +55,31 @@ hsv = cv2.cvtColor(image2, cv2.COLOR_BGR2HSV)
 
 #iterate through the rgb, convert to hsv, and search
 for rgbVal in foundRGBColors:
-    #convert RGB to HSV
-    thisHSV = RGB_2_HSV( rgbVal )
-    print(thisHSV)
 
-	"""
+	#convert RGB to HSV
+	h,s,v = colorsys.rgb_to_hsv(rgbVal[0]/255., rgbVal[1]/255., rgbVal[2]/255.)
 
-    #convert RGB to HSV
-    h,s,v = colorsys.rgb_to_hsv(rgbVal[0]/255., rgbVal[1]/255., rgbVal[2]/255.)
-    newHSV = (360 * h, 100 * s, 100 * v)
+	#opencv's hue range is from 0 - 180, sat 0-255, val 0-255
 
-    print(newHSV)
-	
-	"""
+	#used for checking detected values from previous steps
+	unHSV = (360 * h, 100 * s, 100 * v)
+	#print(unHSV)
 
-    #convert RGB to HSV
-    h,s,v = colorsys.rgb_to_hsv(rgbVal[0]/255., rgbVal[1]/255., rgbVal[2]/255.)
-    newHSV = (360 * h, 100 * s, 100 * v)
+	scale = 255/100
+	newH = math.ceil(h * 180)
+	newS = math.ceil(unHSV[1] * scale)
+	newV = math.ceil(unHSV[2] * scale)
 
-    print(newHSV)
+	print ("newHSV   " + str( (newH, newS, newV) ))
 
-    #apply a mask that will only seek out this one color in the image
-    mask = cv2.inRange(hsv, (thisHSV[0]-10, 100, 100), (thisHSV[1]+10, 255, 255))
+	#apply a mask that will only seek out this one color in the image
+	if newH - 10 < 0:
+		mask = cv2.inRange(hsv, (0, 100, 100), (newH+10, 255, 255))
+	else:
+		mask = cv2.inRange(hsv, (newH-10, 100, 100), (newH+10, 255, 255))
 
-    res = cv2.bitwise_and(hsv,hsv, mask= mask)
+	res = cv2.bitwise_and(hsv,hsv, mask= mask)
 
-    cv2.imshow('res', res)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+	cv2.imshow('res', res)
+	cv2.waitKey(0)
+	cv2.destroyAllWindows()
