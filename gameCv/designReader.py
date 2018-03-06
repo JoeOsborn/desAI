@@ -1,4 +1,5 @@
 #A look at background subtraction in video games
+#playing around with sample tracker code
 
 #TODO group things by contour size
 #TODO store a data array in the method that joseph recommended
@@ -28,6 +29,9 @@ Handles the initial video movement detection via frame differences
 """
 def detectDiff():
 
+    #player tracker
+    tracker = cv2.TrackerMIL_create()
+
     #used for finding colors in the image
     #video = cv2.VideoCapture("./video/mario.mov")
     video = cv2.VideoCapture("./video/zelda.mov")
@@ -53,6 +57,9 @@ def detectDiff():
 
     i = 0 #for tracking frames
 
+    #boundBox of ROI at first
+    boundBox = None
+
     #case for first frame - in which we do not need to check for fram changes
     if prevFrame is None:
 
@@ -61,8 +68,6 @@ def detectDiff():
         firstEdge = cv2.Canny(firstImage, 75, 200)
 
         prevFrame = firstEdge
-
-    #while(1):
 
     while ret:
 
@@ -75,8 +80,8 @@ def detectDiff():
         else:
 
             #save the current frame
-#            if (i%10==0):
-#                cv2.imwrite("./images/"+ str(i)+ ".jpg", frame)
+            #if (i%10==0):
+                #cv2.imwrite("./images/"+ str(i)+ ".jpg", frame)
 
             #store a list of actual image file dirs
             allFrames.append("./images/"+ str(i)+ ".jpg")
@@ -120,6 +125,24 @@ def detectDiff():
                     #apply a bounding box over everything moving
                     (x, y, w, h) = cv2.boundingRect(c)
 
+                    #print(w,h)
+
+                    if boundBox is None:
+
+                        boundBox = (x, y, w, h)
+
+                        #initiate the tracker
+                        ret = tracker.init(frame, boundBox)
+
+                    #find region of interest
+                    roi = frame[y:y+h, x:x+w]
+
+                    boundBox = (x, y, w, h)
+
+                    #save roi
+                    if i%5==0:
+                        cv2.imwrite("./templates/"+ str(i)+ ".jpg", roi)
+
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
                     #print("rectangle frame size : " + str( (x+w, y+h)) )
@@ -134,12 +157,24 @@ def detectDiff():
 
                     else:
 
-                        data[ round(contSize, 3) ] = [ (x,y,w,h) ]
+                        data [ round(contSize, 3) ] = [ (x,y,w,h) ]
 
                     #extra - build templates
-                    croppedFrame = frame[x:(x+int(x/2)), y:(y+int(y/2))]
-                    cv2.imshow("cropped" , croppedFrame)
+                    #cv2.imshow("ROI" , roi)
                     #cv2.waitKey(0)
+
+
+            if boundBox is not None:
+
+                 # Update tracker
+                ret, boundBox = tracker.update(frame)
+
+                if ret:
+                    p1 = (int(boundBox[0]), int(boundBox[1]))
+                    p2 = (int(boundBox[0] + boundBox[2]), int(boundBox[1] + boundBox[3]))
+                    cv2.rectangle(frame, p1, p2, (255,0,0), 2, 1)
+                else:
+                    print("Mission failed...")
 
             cv2.imshow("frame", frame)
 
@@ -156,8 +191,14 @@ def detectDiff():
 
     video.release()
 
+#Find still objects that we've seen
+#def findStills():
+
+
 """
-Attempts to sort/ associate vector positions that are relative to one object
+
+Attempts to group (x,y,w,h) values within contour range
+
 """
 
 def groupObjects():
@@ -195,6 +236,8 @@ def groupObjects():
 
                         #well add it to the object
                         objects[keys]["contours"].append(size)
+
+                        #center = (objects[keys][0].br() + objects[keys][0].tl())*0.5;
 
                         innerDone = True
 
@@ -239,14 +282,8 @@ def groupObjects():
 
         #print("groupObjects() has ran " + str(trigCt))
 
-#extract ROI to build template
-#def leROIJenkins():
-
-
 #function calls
 detectDiff()
-
-#print("stuffff" + str(data) )
 
 groupObjects()
 
@@ -258,3 +295,50 @@ print("object dict " + str(objects["obj0"]) )
 #where is everything persistence
 
 # use code in emails to match up the old rectangles with thew new rectangles
+
+"""
+import networkx as nx
+from networkx.algorithms import matching
+
+sigma = 8.0
+min_gate = 5.0
+
+def weight(orig, post, R):
+  beforeRect = np.array(orig[0..4]) # assuming post is a 4-tuple of xywh, you can use whatever transformation makes sense here
+  postRect = np.array(post[0..4]) # assuming post is a 4-tuple of xywh, you can use whatever transformation makes sense here
+  # TODO: maybe figure out a way to use the pixel values in the image as well
+  distance = np.linalg.norm(postRect - origRect)
+  return scipy.stats.norm(0, R).pdf(distance)
+
+# in some loop, which ends with before_objects = after_objects before continuing around and in whose first iteration before_objects is empty.
+B = nx.Graph()
+for oi in range(len(before_objects)):
+  B.add_node(“before{}”.format(oi))
+for pi in range(len(after_objects)): # already augmented with the “stay” objects
+  B.add_node(“created{}”.format(pi))
+  B.add_node(“after{}”.format(pi))
+  B.add_edge(“created{}”.format(oi), “after{}”.format(pi), weight=scipy.stats.norm(0, sigma).pdf(min_gate * sigma)
+for oi,o in enumerate(before_objects):
+  for pi,p in enumerate(after_objects):
+    B.add_edge(“before{}”.format(oi), “after{}”.format(pi), weight=weight(o, p, 8.0)
+match = matching.max_weight_matching(B)
+
+just_deleted = set()
+just_created = set()
+for pi,p in enumerate(after_objects):
+  oi_node = match[“after{}”.format(pi)]
+  if ‘start’ in oi_node:
+    just_created.add(“after{}”.format(pi))
+    runs.push(…) # add a new run here
+  else:
+    oi = int(oi_node[5:])
+    o = before_objects[o]
+    runs[…]… # update the corresponding run here.  You need a way to connect before_objects to runs.  It might make sense to even just use runs _as_ before_objects, filtering for only runs that have not ended.  Or have separate live_runs and old_runs arrays.
+to_delete = set()
+  for oi,o in enumerate(before_objects):
+    if “before{}”.format(oi) not in match:
+      pass
+      # maybe move the run corresponding to this object into old_runs
+      # or otherwise deal with the fact this object is not around anymore.
+      # “coasting” could be used here to give objects a grace period before killing them from runs.
+"""
