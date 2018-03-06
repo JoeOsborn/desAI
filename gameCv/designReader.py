@@ -24,279 +24,155 @@ data = {}
 #              }
 objects = {}
 
+#Handles the main loop
+def main():
+
+    #video source files
+    #video = cv2.VideoCapture("./video/mario.mov")
+    video = cv2.VideoCapture("./video/zelda.mov")
+
+    #live = { trackID : (frame first seen, [array of box tuples] ) }
+    #dead = { trackID : (frame, [array of box tuples] ) }
+    live  = {}
+    dead = {}
+
+    #frameCount
+    frameC = 0
+
+    prevF = None
+    currF = None
+
+    #initial frameRead
+    ret, frame = video.read()
+
+    #initial frame setting
+    prevF = frame
+    currF = frame
+
+    while ret:
+
+        print("frameCount " + str(frameC))
+        #print("frameCount " + str(frame))
+
+        ret, frame = video.read()
+
+        #increment frameCount
+        frameC+=1
+
+        #get the two boxes in the current frame that we're looking at
+        if frameC > 0:
+            #update the currFrame
+            currF = frame
+
+            #recieve an array of all the box tuples we found
+            boxes = findBoxes(prevF, currF)
+
+            print( boxes )
+
+        for l in live:
+            lastSeen = l[1][-1]
+            if keepRun (lastSeen, results, prevFrame, frame):
+                boxes.append(lastSeen)
+                prevF = currF
+
 """
 Handles the initial video movement detection via frame differences
 """
-def detectDiff():
+def findBoxes(frame1, frame2):
 
-    #player tracker
-    tracker = cv2.TrackerMIL_create()
+    firstImg = cv2.bilateralFilter(frame1, 5, 175, 175)
 
-    #used for finding colors in the image
-    #video = cv2.VideoCapture("./video/mario.mov")
-    video = cv2.VideoCapture("./video/zelda.mov")
+    firstEdge = cv2.Canny(firstImg, 75, 200)
+
+    prevFrame = firstEdge
+
+    #results from the contour
+    results = []
 
     #bgObj = cv2.bgsegm.createBackgroundSubtractorMOG()
     bgObj = cv2.bgsegm.createBackgroundSubtractorMOG()
 
-    prevFrame = None
+    #smooths the image with sharper edges - better for detailed super metroid
+    #slightly heavier on performance
+    bilateral_filtered_image = cv2.bilateralFilter(frame2, 5, 175, 175)
 
-    #separate values from video into usable chunks
-    ret, frame = video.read()
+    #cv2.imshow('Bilateral', bilateral_filtered_image)
 
-    #gets the width and height of the frame
-    #srcW, srcH = frame.shape[:-1]
+    #find the 'strong' edges of the iamge
+    edge_detected_image = cv2.Canny(bilateral_filtered_image, 75, 200)
 
-    #a list to store all the frames
-    allFrames = []
+    #cv2.imshow('Edge', edge_detected_image)
 
-    #dimensions of the pieces we want to split
-    #splitDim = (srcW/32, srcH/30)
+    #find difference
+    deltaF = cv2.absdiff(prevFrame, edge_detected_image)
 
-    #print("size of each block " + str(splitDim))
+    # dilate the delta
+    # find contours
+    deltaF = cv2.dilate(deltaF, None, iterations=2)
 
-    i = 0 #for tracking frames
+    #cv2.imshow("frame difference", deltaF)
 
-    #boundBox of ROI at first
-    boundBox = None
+    # https://docs.opencv.org/2.4/modules/imgproc/doc/structural_analysis_and_shape_descriptors.html?highlight=findcontours#findcontours
+    # findContours(image, retrieval mode, contour approximation)
+    # conts is a vector of points
+    _, conts, _ = cv2.findContours(deltaF, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    #case for first frame - in which we do not need to check for fram changes
-    if prevFrame is None:
+    # example of c in conts - [ [[357 298]] [[357 302]] [[361 302]] [[361 298]] ] or vector<vector<Point>>
+    for c in conts:
 
-        firstImage = cv2.bilateralFilter(frame, 5, 175, 175)
+        #print ("this is c in conts : " + str(c) )
 
-        firstEdge = cv2.Canny(firstImage, 75, 200)
+        #area of the contour
+        contSize = cv2.contourArea(c)
 
-        prevFrame = firstEdge
+        #make sure it's a certain size
+        if (500 <= contSize < 1200):
 
-    while ret:
+            #apply a bounding box over everything moving
+            (x, y, w, h) = cv2.boundingRect(c)
 
-        #separate values from video into usable chunks
-        ret, frame = video.read()
+            results.append( (x,y,w,h) )
 
-        if (frame is None ):
-            break
+            #find region of interest
+            #roi = frame1[y:y+h, x:x+w]
+            #save roi
+            #cv2.imwrite("./templates/"+ "o" + ".jpg", roi)
 
-        else:
+    return results
 
-            #save the current frame
-            #if (i%10==0):
-                #cv2.imwrite("./images/"+ str(i)+ ".jpg", frame)
+#checks if the main loop should continue
+def keepRun(oldB, newB, prevF, currF):
 
-            #store a list of actual image file dirs
-            allFrames.append("./images/"+ str(i)+ ".jpg")
+    amount = 100
 
-            #smooths the image with sharper edges - better for detailed super metroid
-            #slightly heavier on performance
-            bilateral_filtered_image = cv2.bilateralFilter(frame, 5, 175, 175)
+    #compares the x,y,w,h values
+    #for oldB in newB:
+        #if same oldB-10 <= newB <= oldB+10
+    #        return False
 
-            #cv2.imshow('Bilateral', bilateral_filtered_image)
+    #(x,y,w,h contains oldB)
 
-            #find the 'strong' edges of the iamge
-            edge_detected_image = cv2.Canny(bilateral_filtered_image, 75, 200)
+    #compares content of the pixels
+    oldPix = prevF [y:y+h, x:x+w]
+    newPix = currF [y:y+h, x:x+w]
 
-            #cv2.imshow('Edge', edge_detected_image)
+    if cv2.absdiff(newPix, oldPix) > amount:
+        return True
 
-            #find difference
-            deltaF = cv2.absdiff(prevFrame, edge_detected_image)
+    return False
 
-            # dilate the delta
-            # find contours
-            deltaF = cv2.dilate(deltaF, None, iterations=2)
-
-            #cv2.imshow("frame difference", deltaF)
-
-            # https://docs.opencv.org/2.4/modules/imgproc/doc/structural_analysis_and_shape_descriptors.html?highlight=findcontours#findcontours
-            # findContours(image, retrieval mode, contour approximation)
-            # conts is a vector of points
-            _, conts, _ = cv2.findContours(deltaF, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            # example of c in conts - [ [[357 298]] [[357 302]] [[361 302]] [[361 298]] ] or vector<vector<Point>>
-            for c in conts:
-
-                #print ("this is c in conts : " + str(c) )
-
-                #area of the contour
-                contSize = cv2.contourArea(c)
-
-                #make sure it's a certain size
-                if (contSize > 500):
-
-                    #apply a bounding box over everything moving
-                    (x, y, w, h) = cv2.boundingRect(c)
-
-                    #print(w,h)
-
-                    if boundBox is None:
-
-                        boundBox = (x, y, w, h)
-
-                        #initiate the tracker
-                        ret = tracker.init(frame, boundBox)
-
-                    #find region of interest
-                    roi = frame[y:y+h, x:x+w]
-
-                    boundBox = (x, y, w, h)
-
-                    #save roi
-                    if i%5==0:
-                        cv2.imwrite("./templates/"+ str(i)+ ".jpg", roi)
-
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-                    #print("rectangle frame size : " + str( (x+w, y+h)) )
-                    #print("current contour size : " + str(contSize) )
-                    #print("current center : " + str( (x+w/2, y+h/2) ))
-
-                    if contSize in objects:
-
-                        print("already contains in the dictionary")
-
-                        data[ round(contSize, 3)  ].append ( (x,y,w,h) )
-
-                    else:
-
-                        data [ round(contSize, 3) ] = [ (x,y,w,h) ]
-
-                    #extra - build templates
-                    #cv2.imshow("ROI" , roi)
-                    #cv2.waitKey(0)
-
-
-            if boundBox is not None:
-
-                 # Update tracker
-                ret, boundBox = tracker.update(frame)
-
-                if ret:
-                    p1 = (int(boundBox[0]), int(boundBox[1]))
-                    p2 = (int(boundBox[0] + boundBox[2]), int(boundBox[1] + boundBox[3]))
-                    cv2.rectangle(frame, p1, p2, (255,0,0), 2, 1)
-                else:
-                    print("Mission failed...")
-
-            cv2.imshow("frame", frame)
-
-            #update the last frame for comparison with the next current frame
-            prevFrame = edge_detected_image
-
-            i+=1
-
-            k = cv2.waitKey(30) & 0xff
-
-            if k == 27:
-
-                break
-
-    video.release()
-
-#Find still objects that we've seen
-#def findStills():
-
-
-"""
-
-Attempts to group (x,y,w,h) values within contour range
-
-"""
-
-def groupObjects():
-
-    trigCt = 0
-
-    objC = 0
-    objName = "obj"+str(objC)
-
-    innerDone = False
-
-    #loop through the previous dictionary constructed by detectDiff()
-    for size, tuples in data.items():
-
-        innerDone = False
-
-        #it contains contour sizes as keys, and tuple with positional/dimensional values
-        #check if the contour size exists in any of the new dictionary's value values, yeah nested values - "contours"
-        if len(objects) > 0:
-
-            for keys in list(objects):
-
-                #print("the keys in objects is ... " + str(objects) )
-
-                #print("objects[keys][contours]" + str(objects[keys]["contours"]) )
-
-                #loop through the contour sizes of current key...
-                for values in objects[keys]["contours"]:
-
-                    #this size was seen before...
-                    if size in objects[keys]["contours"]:
-
-                        print("added something we've seen before ")
-                        trigCt +=1
-
-                        #well add it to the object
-                        objects[keys]["contours"].append(size)
-
-                        #center = (objects[keys][0].br() + objects[keys][0].tl())*0.5;
-
-                        innerDone = True
-
-                    #contour is in range
-                    elif ( (values*0.95) <= size < (values+170*1.05) ):
-
-                        trigCt +=1
-
-                        objects[keys]["contours"].append( size )
-                        objects[keys]["tuples"].append(tuples)
-
-                        innerDone = True
-
-                        break
-
-                    #this wasn't found within range
-                    elif size not in objects[keys]["contours"]:
-
-                        trigCt +=1
-
-                        #print("making a new entry")
-
-                        objC+=1
-
-                        objName = "obj"+str(objC)
-
-                        objects[objName] = {"tuples" : [tuples], "contours": [ size ] }
-
-                        innerDone = True
-
-                        break
-
-                #break out of the inner loop
-                if innerDone:
-                    break
-
-        #looks like we don't have anything to compare it to..
-        else:
-            objects[objName] = {"tuples" : [tuples], "contours": [ size ] }
-            objC+=1
-            #print("object dict " + str(objects) )
-
-        #print("groupObjects() has ran " + str(trigCt))
 
 #function calls
-detectDiff()
+main()
 
-groupObjects()
-
-print("object dict " + str(objects["obj0"]) )
-#print("data " + str(len(data)))
 
 #cv2.destroyAllWindows()
-
-#where is everything persistence
 
 # use code in emails to match up the old rectangles with thew new rectangles
 
 """
+def biMatch (live, boxes):
+
 import networkx as nx
 from networkx.algorithms import matching
 
@@ -335,9 +211,9 @@ for pi,p in enumerate(after_objects):
     o = before_objects[o]
     runs[…]… # update the corresponding run here.  You need a way to connect before_objects to runs.  It might make sense to even just use runs _as_ before_objects, filtering for only runs that have not ended.  Or have separate live_runs and old_runs arrays.
 to_delete = set()
-  for oi,o in enumerate(before_objects):
-    if “before{}”.format(oi) not in match:
-      pass
+for oi,o in enumerate(before_objects):
+  if “before{}”.format(oi) not in match:
+    pass
       # maybe move the run corresponding to this object into old_runs
       # or otherwise deal with the fact this object is not around anymore.
       # “coasting” could be used here to give objects a grace period before killing them from runs.
