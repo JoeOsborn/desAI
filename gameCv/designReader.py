@@ -12,7 +12,7 @@ import cv2
 import image_slicer
 import networkx as nx
 from networkx.algorithms import matching
-
+import scipy.stats
 
 """
 Main functionality of the program
@@ -30,6 +30,9 @@ def main():
 
     #frameCount
     frameC = 0
+
+    #trackID number
+    trackID = 0
 
     prevF = None
     currF = None
@@ -57,27 +60,39 @@ def main():
         if frameC > 0 and currF is not None:
 
             #recieve an array of all the box tuples we found due to a difference in two frames
-            boxes = findBoxes(prevF, currF)
+            boxes = findBoxes(prevF, currF, frameC, trackID)
 
             print( "boxes " + str(boxes) )
+
+        #if live is empty
+        if len(live)==0:
+            live = boxes
+
+        #current key we have
+        keyCount = 0
+        currKey = "track"+str(keyCount)
 
         #iterate through the live objects we have
         # If a live box has identical/mostly identical pixels in current frame and prev frame, add it to boxes
         for l in live:
 
-            lastSeen = l[1][-1]
+            #print("l in live : " + str(l))
 
-            #print("last seen " + str(lastSeen) )
+            lastSeen = l[currKey][1]
+
+            print("last seen " + str(lastSeen) )
 
             #make sure we should keep
-            if keepBox (lastSeen, results, prevF, currF):
+            if keepBox (lastSeen, boxes, prevF, currF, currKey):
 
                 #
                 boxes.append(lastSeen)
 
+                keyCount +=1
+
 
         #take in live and the boxes we found this screen and perform bipartite matching on them
-        match = biMatch(live, boxes)
+        match = biMatch(live, boxes, currKey)
 
         # update live{} with content from boxes using bipartite matching
         # ^ add new tracks to live and move from live to dead any track that didn’t get matched with a box in boxes
@@ -88,7 +103,7 @@ def main():
 """
 Handles the initial video movement detection via frame differences
 """
-def findBoxes(frame1, frame2):
+def findBoxes(frame1, frame2, frameC, trackID):
 
     firstImg = cv2.bilateralFilter(frame1, 5, 175, 175)
 
@@ -138,18 +153,30 @@ def findBoxes(frame1, frame2):
             #apply a bounding box over everything moving
             (x, y, w, h) = cv2.boundingRect(c)
 
-            results.append( (x,y,w,h) )
+            results.append( {str("track"+str(trackID)): (frameC, (x,y,w,h))} )
 
     return results
 
 #checks if the main loop should continue
-def keepBox(oldB, newB, prevF, currF):
+def keepBox(oldB, newB, prevF, currF, currKey):
 
     amount = 100
 
     #compares the x,y,w,h values
-    for oldB in newB:
-        if oldB-10 <= newB <= oldB+10:
+    for box in newB:
+
+        #print("oldB" + str(oldB) )
+
+        #print ("box" + str(box) )
+
+        #print("newB" + str(newB) )
+
+        print("box" + str(box[currKey][1][0]))
+
+        #get the distance between old Box and new Box
+        dist = np.linalg.norm( np.subtract((box[currKey][1][0], box[currKey][1][1]), (oldB[0], oldB[1]))  )
+
+        if 0 <= dist <= 10:
             return False
 
     #(x,y,w,h contains oldB)
@@ -164,21 +191,27 @@ def keepBox(oldB, newB, prevF, currF):
     return False
 
 #bipartite matching function
-def biMatch (live, boxes):
-
-    #print("live contains : " + str(live) )
-
-    #print("boxes contains : " + str(boxes) )
+def biMatch (live, boxes, currKey):
 
     sigma = 8.0
     min_gate = 5.0
 
+    print("live contains : " + str(live) )
+
+    print("boxes contains : " + str(boxes) )
 
     def weight(orig, post, R):
-        beforeRect = np.array(orig) # assuming orig is a 4-tuple of xywh, you can use whatever transformation makes sense here
-        postRect = np.array(post) # assuming post is a 4-tuple of xywh, you can use whatever transformation makes sense here
 
-        distance = np.linalg.norm(postRect - origRect)
+        print ("weight()'s orig : " + str( orig[currKey][1] ))
+
+        print ("weight()'s post : " + str( post[currKey][1] ))
+
+        beforeRect = np.array(orig[currKey][1] ) # assuming orig is a 4-tuple of xywh, you can use whatever transformation makes sense here
+
+        postRect = np.array(post[currKey][1] ) # assuming post is a 4-tuple of xywh, you can use whatever transformation makes sense here
+
+        distance = np.linalg.norm(postRect - beforeRect)
+
         return scipy.stats.norm(0, R).pdf(distance)
 
     # in some loop, which ends with live = after_objects before continuing around and in whose first iteration live is empty.
@@ -196,18 +229,31 @@ def biMatch (live, boxes):
 
     match = matching.max_weight_matching(B)
 
+    print ("match contents " + str(match) )
+
     just_deleted = set()
     just_created = set()
 
-    for pi,p in enumerate(boxes):
-      oi_node = match["after{}".format(pi)]
-      if "start" in oi_node:
-        just_created.add("after{}".format(pi))
-        runs.push(p) # add a new run here
-      else:
-        oi = int(oi_node[5:])
-        o = live[o]
-        runs[o] = o # update the corresponding run here.  You need a way to connect live to runs.  It might make sense to even just use runs _as_ live, filtering for only runs that have not ended.  Or have separate live_runs and old_runs arrays.
+    for pi, p in enumerate(boxes):
+
+        print ("loop contents : pi " + str(pi) + "  p:   " + str(p) )
+
+        oi_node = match["after{}".format(pi)]
+
+        if "start" in oi_node:
+
+            just_created.add("after{}".format(pi))
+            runs.push(p) # add a new run here
+
+        else:
+
+            print("match contents " + str(match))
+
+            print( "oi_node " + str(oi_node))
+            oi = int(oi_node[5:])
+
+            o = live[o]
+            runs[o] = o # update the corresponding run here.  You need a way to connect live to runs.  It might make sense to even just use runs _as_ live, filtering for only runs that have not ended.  Or have separate live_runs and old_runs arrays.
 
     to_delete = set()
 
