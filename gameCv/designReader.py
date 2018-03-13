@@ -176,16 +176,18 @@ def keepBox(oldB, newB, prevF, currF, currKey):
         #get the distance between old Box and new Box
         dist = np.linalg.norm( np.subtract((box[currKey][1][0], box[currKey][1][1]), (oldB[0], oldB[1]))  )
 
-        if 0 <= dist <= 10:
+        if  dist >= 10:
             return False
 
-    #(x,y,w,h contains oldB)
-
+    print ("prevF" + str(prevF) )
+    print ("currF" + str(currF) )
     #compares content of the pixels
-    oldPix = prevF [y:y+h, x:x+w]
-    newPix = currF [y:y+h, x:x+w]
+    #oldPix = prevF [y:y+h, x:x+w]
+    #newPix = currF [y:y+h, x:x+w]
+    oldPix = prevF
+    newPix = currF
 
-    if cv2.absdiff(newPix, oldPix) > amount:
+    if cv2.absdiff(newPix, oldPix).sum() > amount:
         return True
 
     return False
@@ -206,9 +208,9 @@ def biMatch (live, boxes, currKey):
 
         print ("weight()'s post : " + str( post[currKey][1] ))
 
-        beforeRect = np.array(orig[currKey][1] ) # assuming orig is a 4-tuple of xywh, you can use whatever transformation makes sense here
+        beforeRect = np.array(orig[currKey][1] )
 
-        postRect = np.array(post[currKey][1] ) # assuming post is a 4-tuple of xywh, you can use whatever transformation makes sense here
+        postRect = np.array(post[currKey][1] )
 
         distance = np.linalg.norm(postRect - beforeRect)
 
@@ -217,16 +219,26 @@ def biMatch (live, boxes, currKey):
     # in some loop, which ends with live = after_objects before continuing around and in whose first iteration live is empty.
     B = nx.Graph()
 
+    print("length of live :" + str( len(live) ) )
+
     for oi in range(len(live)):
+
+        print ("for oi in range(len(live)): " + str(oi))
 
         B.add_node("before{}".format(oi))
 
         for pi in range(len(boxes)): # already augmented with the “stay” objects
+
             B.add_node("created{}".format(pi))
+
             B.add_node("after{}".format(pi))
+
             B.add_edge("created{}".format(oi), "after{}".format(pi), weight=scipy.stats.norm(0, sigma).pdf(min_gate * sigma))
+
     for oi, o in enumerate(live):
+
       for pi,p in enumerate(boxes):
+
         B.add_edge("before{}".format(oi), "after{}".format(pi), weight=weight(o, p, 8.0) )
 
     match = matching.max_weight_matching(B)
@@ -234,6 +246,7 @@ def biMatch (live, boxes, currKey):
     print ("match contents " + str(match) )
 
     just_deleted = set()
+
     just_created = set()
 
     for pi, p in enumerate(boxes):
@@ -245,17 +258,20 @@ def biMatch (live, boxes, currKey):
         if "start" in oi_node:
 
             just_created.add("after{}".format(pi))
-            live.update(p) # add a new run here
+
+            live.update(p)
 
         else:
 
             print("match contents " + str(match))
 
             print( "oi_node " + str(oi_node))
+
             oi = int(oi_node[5:])
 
             o = live[o]
-            live[o] = o #runs that have not ended.
+
+            live[o] = o
 
     to_delete = set()
 
