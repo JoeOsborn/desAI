@@ -218,7 +218,9 @@ def biMatch (live, boxes, currKey):
     B = nx.Graph()
 
     for oi in range(len(live)):
+
         B.add_node("before{}".format(oi))
+
         for pi in range(len(boxes)): # already augmented with the “stay” objects
             B.add_node("created{}".format(pi))
             B.add_node("after{}".format(pi))
@@ -243,7 +245,7 @@ def biMatch (live, boxes, currKey):
         if "start" in oi_node:
 
             just_created.add("after{}".format(pi))
-            runs.push(p) # add a new run here
+            live.update(p) # add a new run here
 
         else:
 
@@ -253,7 +255,7 @@ def biMatch (live, boxes, currKey):
             oi = int(oi_node[5:])
 
             o = live[o]
-            runs[o] = o # update the corresponding run here.  You need a way to connect live to runs.  It might make sense to even just use runs _as_ live, filtering for only runs that have not ended.  Or have separate live_runs and old_runs arrays.
+            live[o] = o #runs that have not ended.
 
     to_delete = set()
 
