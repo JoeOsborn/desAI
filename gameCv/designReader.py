@@ -64,38 +64,66 @@ def main():
 
             print( "boxes " + str(boxes) )
 
-        #if live is empty
-        if len(live)==0:
-            live = boxes
-
-        #current key we have
-        keyCount = 0
-        currKey = "track"+str(keyCount)
-
         #iterate through the live objects we have
         # If a live box has identical/mostly identical pixels in current frame and prev frame, add it to boxes
         for l in live:
 
             print("l in live : " + str(l))
 
-            lastSeen = l[currKey][1]
+            lastSeen = live[l][1][-1] #[currKey][1]
 
-            print("last seen " + str(lastSeen) )
+            print("last seen box " + str(lastSeen) )
 
             #make sure we should keep
-            if keepBox (lastSeen, boxes, prevF, currF, currKey):
+            if keepBox (lastSeen, boxes, prevF, currF):
 
                 #
                 boxes.append(lastSeen)
 
-                keyCount +=1
-
-
         #take in live and the boxes we found this screen and perform bipartite matching on them
-        match = biMatch(live, boxes, currKey)
+        match = biMatch(live, boxes)
+
+        #assert( len(live)==0 or len(match)>0 )
 
         # update live{} with content from boxes using bipartite matching
         # ^ add new tracks to live and move from live to dead any track that didn’t get matched with a box in boxes
+        # new wasnt seen before
+        # new - continuation
+        # was new, delete now
+
+        for ind, box in enumerate(boxes):
+
+            key = "after"+str(ind)
+
+            pair = match[key] #now
+
+            if "created" in pair:
+                live[trackID] = (frameC, [box])
+                trackID+=1
+
+            else:
+                #get the trackID
+                newId = int(pair[6:])
+
+                #
+                live[newId][1].append(box)
+
+        for obj in list(live.keys()):
+
+            #if these objects were seen before the current frame
+            if live[obj][0] < frameC:
+
+                key = "before{}".format(obj)
+
+                #was old thing matched with new thing
+                if key not in match:
+
+                    dead[obj] = live[obj] #add entry to dead
+                    del live[obj] #remove from live
+
+        #draw stuff
+        for obj in live:
+            cv2.
 
         #update the previous frame reference
         prevF = currF
@@ -153,12 +181,12 @@ def findBoxes(frame1, frame2, frameC, trackID):
             #apply a bounding box over everything moving
             (x, y, w, h) = cv2.boundingRect(c)
 
-            results.append( {str("track"+str(trackID)): (frameC, (x,y,w,h))} )
+            results.append( (x,y,w,h) )
 
     return results
 
 #checks if the main loop should continue
-def keepBox(oldB, newB, prevF, currF, currKey):
+def keepBox(oldB, newB, prevF, currF):
 
     amount = 100
 
@@ -174,25 +202,26 @@ def keepBox(oldB, newB, prevF, currF, currKey):
         #print("box" + str(box[currKey][1][0]))
 
         #get the distance between old Box and new Box
-        dist = np.linalg.norm( np.subtract((box[currKey][1][0], box[currKey][1][1]), (oldB[0], oldB[1]))  )
+        dist = np.linalg.norm( np.subtract((box[0], box[1]), (oldB[0], oldB[1]))  )
 
-        if  dist >= 10:
-            return False
+        if  dist <= 4:
+            return True
 
     #print ("prevF" + str(prevF) )
     #print ("currF" + str(currF) )
 
     #compares content of the pixels
-    oldPix = prevF
-    newPix = currF
+    (x,y,w,h) = oldB
+    oldPix = prevF[y:y+h, x:x+w]
+    newPix = currF[y:y+h, x:x+w]
 
-    if cv2.absdiff(newPix, oldPix).sum() > amount:
+    if cv2.absdiff(newPix, oldPix).sum() < amount:
         return True
 
     return False
 
 #bipartite matching function
-def biMatch (live, boxes, currKey):
+def biMatch (live, boxes):
 
     sigma = 8.0
     min_gate = 5.0
@@ -203,13 +232,13 @@ def biMatch (live, boxes, currKey):
 
     def weight(orig, post, R):
 
-        print ("weight()'s orig : " + str( orig[currKey][1] ))
+        #print ("weight()'s orig : " + str( orig[currKey][1] ))
 
-        print ("weight()'s post : " + str( post[currKey][1] ))
+        #print ("weight()'s post : " + str( post[currKey][1] ))
 
-        beforeRect = np.array(orig[currKey][1] )
+        beforeRect = np.array(orig[1][-1] )
 
-        postRect = np.array(post[currKey][1] )
+        postRect = np.array(post)
 
         distance = np.linalg.norm(postRect - beforeRect)
 
@@ -218,25 +247,25 @@ def biMatch (live, boxes, currKey):
     # in some loop, which ends with live = after_objects before continuing around and in whose first iteration live is empty.
     B = nx.Graph()
 
-    print("length of live :" + str( len(live) ) )
+    #print("length of live :" + str( len(live) ) )
 
-    for oi in range(len(live)):
+    for oi in live:
 
         print ("for oi in range(len(live)): " + str(oi))
 
         B.add_node("before{}".format(oi))
 
-        for pi in range(len(boxes)): # already augmented with the “stay” objects
+    for pi in range(len(boxes)): # already augmented with the “stay” objects
 
-            B.add_node("created{}".format(pi))
+        B.add_node("created{}".format(pi))
 
-            B.add_node("after{}".format(pi))
+        B.add_node("after{}".format(pi))
 
-            B.add_edge("created{}".format(oi), "after{}".format(pi), weight=scipy.stats.norm(0, sigma).pdf(min_gate * sigma))
+        B.add_edge("created{}".format(pi), "after{}".format(pi), weight=scipy.stats.norm(0, sigma).pdf(min_gate * sigma))
 
-    for oi, o in enumerate(live):
+    for oi, o in live.items():
 
-      for pi,p in enumerate(boxes):
+      for pi, p in enumerate(boxes):
 
         B.add_edge("before{}".format(oi), "after{}".format(pi), weight=weight(o, p, 8.0) )
 
@@ -244,44 +273,10 @@ def biMatch (live, boxes, currKey):
 
     print ("match contents " + str(match) )
 
-    just_deleted = set()
-
-    just_created = set()
-
-    for pi, p in enumerate(boxes):
-
-        print ("loop contents : pi " + str(pi) + "  p:   " + str(p) )
-
-        oi_node = match["after{}".format(pi)]
-
-        if "start" in oi_node:
-
-            just_created.add("after{}".format(pi))
-
-            live.update(p)
-
-        else:
-
-            print("match contents " + str(match))
-
-            print( "oi_node " + str(oi_node))
-
-            oi = int(oi_node[5:])
-
-            o = live[o]
-
-            live[o] = o
-
-    to_delete = set()
-
-    for oi,o in enumerate(live):
-      if "before{}".format(oi) not in match:
-        pass
-          # maybe move the run corresponding to this object into old_runs
-          # or otherwise deal with the fact this object is not around anymore.
-          # “coasting” could be used here to give objects a grace period before killing them from runs.
-
     return match
+
+#
+def visualise():
 
 #function calls
 main()
