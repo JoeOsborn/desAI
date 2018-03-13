@@ -76,7 +76,7 @@ def main():
         # If a live box has identical/mostly identical pixels in current frame and prev frame, add it to boxes
         for l in live:
 
-            #print("l in live : " + str(l))
+            print("l in live : " + str(l))
 
             lastSeen = l[currKey][1]
 
@@ -171,7 +171,7 @@ def keepBox(oldB, newB, prevF, currF, currKey):
 
         #print("newB" + str(newB) )
 
-        print("box" + str(box[currKey][1][0]))
+        #print("box" + str(box[currKey][1][0]))
 
         #get the distance between old Box and new Box
         dist = np.linalg.norm( np.subtract((box[currKey][1][0], box[currKey][1][1]), (oldB[0], oldB[1]))  )
@@ -179,11 +179,10 @@ def keepBox(oldB, newB, prevF, currF, currKey):
         if  dist >= 10:
             return False
 
-    print ("prevF" + str(prevF) )
-    print ("currF" + str(currF) )
+    #print ("prevF" + str(prevF) )
+    #print ("currF" + str(currF) )
+
     #compares content of the pixels
-    #oldPix = prevF [y:y+h, x:x+w]
-    #newPix = currF [y:y+h, x:x+w]
     oldPix = prevF
     newPix = currF
 
