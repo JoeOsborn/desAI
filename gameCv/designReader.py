@@ -37,18 +37,15 @@ def main():
     prevF = None
     currF = None
 
-    #initial frameRead
-    ret, frame = video.read()
-
-    #initial frame setting
-    prevF = frame
-    currF = frame
-
-    while ret:
-
-        #print("frameCount " + str(frameC))
+    while (True):
 
         ret, frame = video.read()
+
+        #make sure initial values checkout
+        if currF is None:
+            currF = frame
+        if prevF is None:
+            prevF = frame
 
         #increment frameCount
         frameC+=1
@@ -62,17 +59,17 @@ def main():
             #recieve an array of all the box tuples we found due to a difference in two frames
             boxes = findBoxes(prevF, currF, frameC, trackID)
 
-            print( "boxes " + str(boxes) )
+            #print( "boxes " + str(boxes) )
 
         #iterate through the live objects we have
         # If a live box has identical/mostly identical pixels in current frame and prev frame, add it to boxes
         for l in live:
 
-            print("l in live : " + str(l))
+            #print("l in live : " + str(l))
 
             lastSeen = live[l][1][-1] #[currKey][1]
 
-            print("last seen box " + str(lastSeen) )
+            #print("last seen box " + str(lastSeen) )
 
             #make sure we should keep
             if keepBox (lastSeen, boxes, prevF, currF):
@@ -82,8 +79,6 @@ def main():
 
         #take in live and the boxes we found this screen and perform bipartite matching on them
         match = biMatch(live, boxes)
-
-        #assert( len(live)==0 or len(match)>0 )
 
         # update live{} with content from boxes using bipartite matching
         # ^ add new tracks to live and move from live to dead any track that didn’t get matched with a box in boxes
@@ -121,13 +116,26 @@ def main():
                     dead[obj] = live[obj] #add entry to dead
                     del live[obj] #remove from live
 
-        #draw stuff
-        for obj in live:
-            cv2.
+        #show the frame ... if it exists
+        if ret:
 
-        #update the previous frame reference
-        prevF = currF
+            #visualise(currF, live)
 
+            #cv2.imshow("Object Paths", currF)
+
+            cv2.imshow("Object Paths", visualise(currF, live) )
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+            #update the previous frame reference
+            prevF = currF
+        else:
+            break
+
+
+    #print("live contents after everything... " + str(live))
+    #print("dead contents after everything... " + str(dead))
 """
 Handles the initial video movement detection via frame differences
 """
@@ -207,9 +215,6 @@ def keepBox(oldB, newB, prevF, currF):
         if  dist <= 4:
             return True
 
-    #print ("prevF" + str(prevF) )
-    #print ("currF" + str(currF) )
-
     #compares content of the pixels
     (x,y,w,h) = oldB
     oldPix = prevF[y:y+h, x:x+w]
@@ -226,9 +231,9 @@ def biMatch (live, boxes):
     sigma = 8.0
     min_gate = 5.0
 
-    print("live contains : " + str(live) )
+    #print("live contains : " + str(live) )
 
-    print("boxes contains : " + str(boxes) )
+    #print("boxes contains : " + str(boxes) )
 
     def weight(orig, post, R):
 
@@ -251,7 +256,7 @@ def biMatch (live, boxes):
 
     for oi in live:
 
-        print ("for oi in range(len(live)): " + str(oi))
+        #print ("for oi in range(len(live)): " + str(oi))
 
         B.add_node("before{}".format(oi))
 
@@ -271,16 +276,33 @@ def biMatch (live, boxes):
 
     match = matching.max_weight_matching(B)
 
-    print ("match contents " + str(match) )
+    #print ("match contents " + str(match) )
 
     return match
 
-#
-def visualise():
+#visualise(currFrame to draw on, values found in live - iterate, give unique color, onnect the dots )
+def visualise(frame, points):
+
+    lineFrame = frame
+
+    #thing in live
+    for thing in points:
+        #print ("thing in points is " + str( points[thing][1][iterate through here] ) )
+        for ind, coord in enumerate(points[thing][1]):
+
+            #print("index " + str(ind) )
+            #print("coord " + str(coord) )
+
+            #if are not looking at the first element in the array
+            #also ouch, my eyes
+            if ind!=0:
+                cv2.line(lineFrame, points[thing][1][ind-1][:2], points[thing][1][ind-1][:2], (255,0,0), 5 )
+
+    return lineFrame
 
 #function calls
 main()
 
-#cv2.destroyAllWindows()
+cv2.destroyAllWindows()
 
 # use code in emails to match up the old rectangles with thew new rectangles
