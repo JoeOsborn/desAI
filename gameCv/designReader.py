@@ -50,6 +50,16 @@ def main():
         #increment frameCount
         frameC+=1
 
+        if (frameC < 50):
+            continue
+        elif (frameC >600):
+            break
+
+        if (frameC>16+50):
+            assert len(live)==1, "frameCount"+ str(frameC) + " counts " + str( len(live) )
+            assert len(dead)==0, "frameCount"+ str(frameC) + " counts " + str( len(live) )
+
+
         #update the currFrame
         currF = frame
 
@@ -60,6 +70,9 @@ def main():
             boxes = findBoxes(prevF, currF, frameC, trackID)
 
             #print( "boxes " + str(boxes) )
+
+        if ( frameC == 67 ):
+            print ( "we have this many new boxes "+ str(boxes) )
 
         #iterate through the live objects we have
         # If a live box has identical/mostly identical pixels in current frame and prev frame, add it to boxes
@@ -76,6 +89,9 @@ def main():
 
                 #
                 boxes.append(lastSeen)
+
+        if ( frameC == 67 ):
+            print ( "we have this many boxes total "+ str(boxes) )
 
         #take in live and the boxes we found this screen and perform bipartite matching on them
         match = biMatch(live, boxes)
@@ -121,9 +137,9 @@ def main():
 
             #visualise(currF, live)
 
-            #cv2.imshow("Object Paths", currF)
+            newFrame = visualise(np.copy(frame), live)
 
-            cv2.imshow("Object Paths", visualise(currF, live) )
+            cv2.imshow("Object Paths", newFrame )
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -163,7 +179,7 @@ def findBoxes(frame1, frame2, frameC, trackID):
     #find the 'strong' edges of the image
     edge_detected_image = cv2.Canny(bilateral_filtered_image, 75, 200)
 
-    #cv2.imshow('Edge', edge_detected_image)
+    cv2.imshow('Edge', edge_detected_image)
 
     #find difference
     deltaF = cv2.absdiff(prevFrame, edge_detected_image)
@@ -172,19 +188,24 @@ def findBoxes(frame1, frame2, frameC, trackID):
     # find contours
     deltaF = cv2.dilate(deltaF, None, iterations=2)
 
-    #cv2.imshow("frame difference", deltaF)
+    cv2.imshow("frame difference", deltaF)
 
     # https://docs.opencv.org/2.4/modules/imgproc/doc/structural_analysis_and_shape_descriptors.html?highlight=findcontours#findcontours
     # findContours(image, retrieval mode, contour approximation)
     _, conts, _ = cv2.findContours(deltaF, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+    print ("contour count " + str(len(conts)) )
+
     # example of c in conts - [ [[357 298]] [[357 302]] [[361 302]] [[361 298]] ] or vector<vector<Point>>
     for c in conts:
+
         #area of the contour
         contSize = cv2.contourArea(c)
 
+        print ("size of the contSize " + str(contSize) )
+
         #make sure contours fall within a certain size
-        if (500 <= contSize < 1500):
+        if (750 <= contSize < 3000):
 
             #apply a bounding box over everything moving
             (x, y, w, h) = cv2.boundingRect(c)
@@ -196,16 +217,10 @@ def findBoxes(frame1, frame2, frameC, trackID):
 #checks if the main loop should continue
 def keepBox(oldB, newB, prevF, currF):
 
-    amount = 100
+    amount = 25500
 
     #compares the x,y,w,h values
     for box in newB:
-
-        #print("oldB" + str(oldB) )
-
-        #print ("box" + str(box) )
-
-        #print("newB" + str(newB) )
 
         #print("box" + str(box[currKey][1][0]))
 
@@ -213,12 +228,18 @@ def keepBox(oldB, newB, prevF, currF):
         dist = np.linalg.norm( np.subtract((box[0], box[1]), (oldB[0], oldB[1]))  )
 
         if  dist <= 4:
-            return True
+            return False
 
     #compares content of the pixels
     (x,y,w,h) = oldB
     oldPix = prevF[y:y+h, x:x+w]
     newPix = currF[y:y+h, x:x+w]
+
+    #print( "oldPix : "+ str(oldPix) )
+
+    #print("newPix : "+ str(newPix) )
+
+    print("cv2.absdiff(newPix, oldPix).sum() : " + str(cv2.absdiff(newPix, oldPix).sum()) )
 
     if cv2.absdiff(newPix, oldPix).sum() < amount:
         return True
@@ -280,25 +301,30 @@ def biMatch (live, boxes):
 
     return match
 
-#visualise(currFrame to draw on, values found in live - iterate, give unique color, onnect the dots )
+#thing corresponds to the key, 0, 1, 2, 3 , 4, etc
+# points[thing] contains (frame first seen, all points we have for now)
+# points[thing][1] contains all the points we have
+#visualise(currFrame to draw on, values found in live - iterate, give unique color, connect the dots )
 def visualise(frame, points):
 
-    lineFrame = frame
+    #pick a random color for any new things
+    #filter out the object
+
+    thisFrame = frame
 
     #thing in live
     for thing in points:
-        #print ("thing in points is " + str( points[thing][1][iterate through here] ) )
-        for ind, coord in enumerate(points[thing][1]):
 
-            #print("index " + str(ind) )
-            #print("coord " + str(coord) )
+        for ind, pt in enumerate(points[thing][1]) :
 
-            #if are not looking at the first element in the array
-            #also ouch, my eyes
+            print("pt " + str(pt))
+
             if ind!=0:
-                cv2.line(lineFrame, points[thing][1][ind-1][:2], points[thing][1][ind-1][:2], (255,0,0), 5 )
 
-    return lineFrame
+                cv2.rectangle(thisFrame, pt[:2], ( pt[2]+pt[0] ,pt[3]+pt[1]), (0,255,0), 3 )
+                #cv2.line(lineFrame, points[ind-1], pt, (255,0,0), 5 )
+
+    return thisFrame
 
 #function calls
 main()

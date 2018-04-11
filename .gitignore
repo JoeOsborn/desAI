@@ -10,3 +10,6 @@ video/
 /libAdapter/GRTAGS
 /libAdapter/GTAGS
 .mypy_cache/
+funky.mov
+funky2.mov
+templates/
