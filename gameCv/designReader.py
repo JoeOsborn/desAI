@@ -13,6 +13,11 @@ import image_slicer
 import networkx as nx
 from networkx.algorithms import matching
 import scipy.stats
+import random
+
+#for the visualisation function
+objects = []
+colors = []
 
 """
 Main functionality of the program
@@ -50,15 +55,19 @@ def main():
         #increment frameCount
         frameC+=1
 
-        if (frameC < 50):
+        if (frameC < 500):
             continue
-        elif (frameC >600):
+        elif (frameC >525):
             break
 
-        if (frameC>16+50):
+        #checks the first screen
+        if (frameC>50 + 16 and frameC<482):
             assert len(live)==1, "frameCount"+ str(frameC) + " counts " + str( len(live) )
             assert len(dead)==0, "frameCount"+ str(frameC) + " counts " + str( len(live) )
 
+        #once we're past the weird scrolling
+        elif (frameC>500):
+            assert len(live)>=1, "frameCount"+ str(frameC) + " counts " + str( len(live) )
 
         #update the currFrame
         currF = frame
@@ -135,8 +144,9 @@ def main():
         #show the frame ... if it exists
         if ret:
 
-            #visualise(currF, live)
+            print( "live" + str(live) )
 
+            #visualise(currF, live)
             newFrame = visualise(np.copy(frame), live)
 
             cv2.imshow("Object Paths", newFrame )
@@ -194,7 +204,7 @@ def findBoxes(frame1, frame2, frameC, trackID):
     # findContours(image, retrieval mode, contour approximation)
     _, conts, _ = cv2.findContours(deltaF, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    print ("contour count " + str(len(conts)) )
+    #print ("contour count " + str(len(conts)) )
 
     # example of c in conts - [ [[357 298]] [[357 302]] [[361 302]] [[361 298]] ] or vector<vector<Point>>
     for c in conts:
@@ -202,7 +212,7 @@ def findBoxes(frame1, frame2, frameC, trackID):
         #area of the contour
         contSize = cv2.contourArea(c)
 
-        print ("size of the contSize " + str(contSize) )
+        #print ("size of the contSize " + str(contSize) )
 
         #make sure contours fall within a certain size
         if (750 <= contSize < 3000):
@@ -227,7 +237,9 @@ def keepBox(oldB, newB, prevF, currF):
         #get the distance between old Box and new Box
         dist = np.linalg.norm( np.subtract((box[0], box[1]), (oldB[0], oldB[1]))  )
 
-        if  dist <= 4:
+        #print("oldB[1] " + str(oldB[1]) + "dist " + str(dist) )
+
+        if  dist <=4:
             return False
 
     #compares content of the pixels
@@ -235,11 +247,7 @@ def keepBox(oldB, newB, prevF, currF):
     oldPix = prevF[y:y+h, x:x+w]
     newPix = currF[y:y+h, x:x+w]
 
-    #print( "oldPix : "+ str(oldPix) )
-
-    #print("newPix : "+ str(newPix) )
-
-    print("cv2.absdiff(newPix, oldPix).sum() : " + str(cv2.absdiff(newPix, oldPix).sum()) )
+    #print("cv2.absdiff(newPix, oldPix).sum() : " + str(cv2.absdiff(newPix, oldPix).sum()) )
 
     if cv2.absdiff(newPix, oldPix).sum() < amount:
         return True
@@ -301,28 +309,30 @@ def biMatch (live, boxes):
 
     return match
 
+#TODO ignore the bush object
+
 #thing corresponds to the key, 0, 1, 2, 3 , 4, etc
 # points[thing] contains (frame first seen, all points we have for now)
 # points[thing][1] contains all the points we have
 #visualise(currFrame to draw on, values found in live - iterate, give unique color, connect the dots )
 def visualise(frame, points):
 
-    #pick a random color for any new things
-    #filter out the object
-
     thisFrame = frame
 
     #thing in live
-    for thing in points:
+    for objCount, thing in enumerate(points):
+
+        #this object is a new unique one, add it to a list
+        if thing not in objects:
+            #print("thing not in objects")
+            objects.append(thing)
+            colors.append( ( random.randint(0, 255),random.randint(0, 255),random.randint(0, 255) ) )
 
         for ind, pt in enumerate(points[thing][1]) :
 
-            print("pt " + str(pt))
-
             if ind!=0:
 
-                cv2.rectangle(thisFrame, pt[:2], ( pt[2]+pt[0] ,pt[3]+pt[1]), (0,255,0), 3 )
-                #cv2.line(lineFrame, points[ind-1], pt, (255,0,0), 5 )
+                cv2.rectangle(thisFrame, pt[:2], ( pt[2]+ pt[0] ,pt[3]+pt[1]), colors[objCount] , 3 )
 
     return thisFrame
 
