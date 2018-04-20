@@ -29,6 +29,10 @@ def main():
     live  = {}
     dead = {}
 
+    #values check these specific pixel values in the image
+    currPix = []
+    prevPix = []
+
     #video source files
     #video = cv2.VideoCapture("./video/mario.mov")
     video = cv2.VideoCapture("./video/zelda.mov")
@@ -55,9 +59,9 @@ def main():
         #increment frameCount
         frameC+=1
 
-        if (frameC < 500):
+        if (frameC < 30):
             continue
-        elif (frameC >525):
+        elif (frameC >700):
             break
 
         #checks the first screen
@@ -71,6 +75,13 @@ def main():
 
         #update the currFrame
         currF = frame
+
+        #update scrolling (prevF, currF) return values for deltaX, deltaY
+        #update scrollX, scrollY
+        #making sure edge detection + alignment
+        #pass in dX, dY into findBoxes to make sure correct rectangles are subtracted
+        #in keepbox, pass in dX, dY to make sure the current frame is compared to the previous frame
+        #offets scene by dx,dy instead of append; decide what type of coordinates are being used
 
         #get the two boxes in the current frame that we're looking at
         if frameC > 0 and currF is not None:
@@ -121,6 +132,8 @@ def main():
                 live[trackID] = (frameC, [box])
                 trackID+=1
 
+                print("this current trackID" + str(trackID))
+
             else:
                 #get the trackID
                 newId = int(pair[6:])
@@ -154,9 +167,21 @@ def main():
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
+            #perform edge detection and return the pixel values
+            currPix = getEdgePixels(frame)
+
+            #compare it to the prevPix if we have that then do the thing (see bottom)
+            if ( len(prevF) > 0):
+                comparePixels(prevF, currPix)
+
+            #update the previous pixel values
+            prevPix = currPix
+
             #update the previous frame reference
             prevF = currF
+
         else:
+
             break
 
 
@@ -239,7 +264,7 @@ def keepBox(oldB, newB, prevF, currF):
 
         #print("oldB[1] " + str(oldB[1]) + "dist " + str(dist) )
 
-        if  dist <=4:
+        if  dist <=4 or box[1]:
             return False
 
     #compares content of the pixels
@@ -329,16 +354,83 @@ def visualise(frame, points):
             colors.append( ( random.randint(0, 255),random.randint(0, 255),random.randint(0, 255) ) )
 
         for ind, pt in enumerate(points[thing][1]) :
-
-            if ind!=0:
-
-                cv2.rectangle(thisFrame, pt[:2], ( pt[2]+ pt[0] ,pt[3]+pt[1]), colors[objCount] , 3 )
+            cv2.rectangle(thisFrame, pt[:2], ( pt[2]+ pt[0] ,pt[3]+pt[1]), colors[objCount] , 3 )
 
     return thisFrame
+
+# - make sure the monster is lost when the player kills the monster
+
+# - for the scrolling tracking, do contour detection/edge detecter (then pick random pixels)
+# on the whole scene (not a difference between scenes) see if
+# a lot of contours have moved (check if it's negative or positive).
+# Eventually, the goal is to have to understand that the world is a whole map,
+# there is an offset between the first area and the next area
+# before a frame for loop is updated, call a function that will do edge detection
+# picks x amount of pixels, then see what kind of x/y offesets occurred during to see what direction pixels
+# have moved
+# if the image is scrolling up, use slicing to cut away image parts that don't overlap, that is don't compare
+# pieces of the image that wasn't originally in the old image frame
+
+#slice by new[2:, 0], old[0:h-2, 0:-1] if the offeset is (0,2)
+
+#check if there are any immediately
+def getEdgePixels(frame):
+
+    z=0
+    pixNum = 100
+
+    #
+    pixelValues = []
+
+    #smooths the image with sharper edges - better for detailed super metroid
+    filtered = cv2.bilateralFilter(frame, 5, 175, 175)
+
+    #find the 'strong' edges of the image
+    edgy = cv2.Canny(filtered, 75, 200)
+
+    #
+    #print ("pixelValues   ::" + str(pixelValues))
+
+    cv2.imshow("edge detected image", edgy)
+
+    #find the pieces that are white colored
+    x,y = np.where(edgy == 255) #coordinate in the matrix
+
+    #print("x : " + str(x) + "y : " + y)
+
+    #picks ten random white pixel
+    while z<pixNum:
+        i = np.random.randint(len(x))
+        pixelValues.append( (x[i], y[i]) ) #keep the pos
+        z+=1
+
+    return pixelValues
+
+#look for an x,y offest that works the best for all of the points
+#offset kepy by dx, dy
+#offset new contous by x,y
+#dictionary with offset in 2D { (-2,-2):0, (-2,1):0, (0,0):0 } inside compare to find
+#in keepbox might need to offset the boxes we find by xscroll, yscroll
+
+#(previouslyEdgeDetectedFrame, currentPixel))
+def comparePixels(prevEdge, currPix):
+
+    #
+    offset = { (-2,2):0, (-2,1):0, (-2,0):0, (-1,2):0, (-1,1):0,(-1,0):0, (0,0):0,
+    (0,1):0, (0,2):0, (0,-1):0, (0,-2):0}
+
+    #loop through the points we picked
+    for point in currPix:
+        print("point in currPix " + str(currPix) )
+
+
+
+    #return an offeset
+    return offset
 
 #function calls
 main()
 
 cv2.destroyAllWindows()
 
-# use code in emails to match up the old rectangles with thew new rectangles
+pass
