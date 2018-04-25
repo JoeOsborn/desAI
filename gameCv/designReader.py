@@ -29,6 +29,9 @@ def main():
     live  = {}
     dead = {}
 
+    prevEdge = None
+    currEdge = None
+
     #values check these specific pixel values in the image
     currPix = []
     prevPix = []
@@ -91,8 +94,8 @@ def main():
 
             #print( "boxes " + str(boxes) )
 
-        if ( frameC == 67 ):
-            print ( "we have this many new boxes "+ str(boxes) )
+        #if ( frameC == 67 ):
+        #    print ( "we have this many new boxes "+ str(boxes) )
 
         #iterate through the live objects we have
         # If a live box has identical/mostly identical pixels in current frame and prev frame, add it to boxes
@@ -110,8 +113,8 @@ def main():
                 #
                 boxes.append(lastSeen)
 
-        if ( frameC == 67 ):
-            print ( "we have this many boxes total "+ str(boxes) )
+        #if ( frameC == 67 ):
+            #print ( "we have this many boxes total "+ str(boxes) )
 
         #take in live and the boxes we found this screen and perform bipartite matching on them
         match = biMatch(live, boxes)
@@ -132,7 +135,7 @@ def main():
                 live[trackID] = (frameC, [box])
                 trackID+=1
 
-                print("this current trackID" + str(trackID))
+                #print("this current trackID" + str(trackID))
 
             else:
                 #get the trackID
@@ -157,7 +160,7 @@ def main():
         #show the frame ... if it exists
         if ret:
 
-            print( "live" + str(live) )
+            #print( "live" + str(live) )
 
             #visualise(currF, live)
             newFrame = visualise(np.copy(frame), live)
@@ -168,14 +171,18 @@ def main():
                 break
 
             #perform edge detection and return the pixel values
-            currPix = getEdgePixels(frame)
+            currEdge = getEdgeFrame(frame)
+            currPix = getCurrPix(currEdge)
 
             #compare it to the prevPix if we have that then do the thing (see bottom)
-            if ( len(prevF) > 0):
-                comparePixels(prevF, currPix)
+            if ( prevEdge is not None):
+                comparePixels(prevEdge, currPix)
 
             #update the previous pixel values
             prevPix = currPix
+
+            #update the previous edge frame
+            prevEdge = currEdge
 
             #update the previous frame reference
             prevF = currF
@@ -373,14 +380,8 @@ def visualise(frame, points):
 
 #slice by new[2:, 0], old[0:h-2, 0:-1] if the offeset is (0,2)
 
-#check if there are any immediately
-def getEdgePixels(frame):
-
-    z=0
-    pixNum = 100
-
-    #
-    pixelValues = []
+#creates and returns an edge frame
+def getEdgeFrame(frame):
 
     #smooths the image with sharper edges - better for detailed super metroid
     filtered = cv2.bilateralFilter(frame, 5, 175, 175)
@@ -393,10 +394,19 @@ def getEdgePixels(frame):
 
     cv2.imshow("edge detected image", edgy)
 
-    #find the pieces that are white colored
-    x,y = np.where(edgy == 255) #coordinate in the matrix
+    return edgy
 
-    #print("x : " + str(x) + "y : " + y)
+#takes an edge frame and then picks different pixel values
+def getCurrPix(edge):
+
+    z=0
+    pixNum = 100
+
+    #
+    pixelValues = []
+
+    #find the pieces that are white colored
+    x,y = np.where(edge == 255) #coordinate in the matrix
 
     #picks ten random white pixel
     while z<pixNum:
@@ -412,17 +422,17 @@ def getEdgePixels(frame):
 #dictionary with offset in 2D { (-2,-2):0, (-2,1):0, (0,0):0 } inside compare to find
 #in keepbox might need to offset the boxes we find by xscroll, yscroll
 
-#(previouslyEdgeDetectedFrame, currentPixel))
+#takes the previous edge detected frame and the last pixel values we took
 def comparePixels(prevEdge, currPix):
 
+    #cv2.imshow("passed into comparepixels", prevEdge)
+
     #
-    offset = { (-2,2):0, (-2,1):0, (-2,0):0, (-1,2):0, (-1,1):0,(-1,0):0, (0,0):0,
-    (0,1):0, (0,2):0, (0,-1):0, (0,-2):0}
+    offset = { (-2,2):0, (-2,1):0, (-2,0):0, (-1,2):0, (-1,1):0,(-1,0):0, (0,0):0, (0,1):0, (0,2):0, (0,-1):0, (0,-2):0 }
 
     #loop through the points we picked
     for point in currPix:
         print("point in currPix " + str(currPix) )
-
 
 
     #return an offeset
