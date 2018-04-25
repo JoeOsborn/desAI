@@ -49,6 +49,9 @@ def main():
     prevF = None
     currF = None
 
+    #offset dictionary
+    offVals = {}
+
     while (True):
 
         ret, frame = video.read()
@@ -176,7 +179,8 @@ def main():
 
             #compare it to the prevPix if we have that then do the thing (see bottom)
             if ( prevEdge is not None):
-                comparePixels(prevEdge, currPix)
+                offVals = comparePixels(prevEdge, currPix)
+                print ("offVals " + str(offVals) )
 
             #update the previous pixel values
             prevPix = currPix
@@ -425,17 +429,45 @@ def getCurrPix(edge):
 #takes the previous edge detected frame and the last pixel values we took
 def comparePixels(prevEdge, currPix):
 
-    #cv2.imshow("passed into comparepixels", prevEdge)
+    #point being compared atm
+    checkPoint = None
 
+    #cv2.imshow("passed into comparepixels", prevEdge)
     #
     offset = { (-2,2):0, (-2,1):0, (-2,0):0, (-1,2):0, (-1,1):0,(-1,0):0, (0,0):0, (0,1):0, (0,2):0, (0,-1):0, (0,-2):0 }
 
-    #loop through the points we picked
-    for point in currPix:
-        print("point in currPix " + str(currPix) )
+    #get the edge pixels in the last frame and compare them to the edge pixels we picked in the current one
+    #x,y = np.where(prevEdge == 255)
 
+    #
+    #print ( "edge " + str(prevEdge) )
 
-    #return an offeset
+    #loop through the points we picked in the current frame and see if there are any neighboring white pixels
+    for currPoint in currPix:
+
+        #print ("currpoint" + str(currPoint))
+
+        #loop through the tuple keys in offset dictionary
+        for dir in offset:
+
+            checkPoint = np.add(currPoint, dir) #ie point (100,100) gets added by (-2,-2)
+
+            #make sure the tuple does not point offscreen checkPoint[0] < 506 and checkPoint[1] < 506
+            if (checkPoint[0] <= 505 and checkPoint[1] <= 505):
+
+                checkTuple = (checkPoint[0], checkPoint[1])
+
+                print ( str(checkPoint) )
+
+                #if the offsetted point is white AND it is not offscreen
+                if (prevEdge[ (checkPoint[0], checkPoint[1]) ]) == 255:
+
+                    #increment the value inside the dictionary
+                    offset[dir] +=1
+
+                    break
+
+    #return dictionary of offset values to check scrolling
     return offset
 
 #function calls
