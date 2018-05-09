@@ -35,6 +35,7 @@ method = cv2.TM_SQDIFF_NORMED
 # Apply template Matching
 res = cv2.matchTemplate(img,template,method)
 
+#save this for the last if we need a bias towards smaller motions
 min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
 
 # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum

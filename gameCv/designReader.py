@@ -1,9 +1,10 @@
-#A look at background subtraction in video games
-#playing around with sample tracker code
+"""
 
-#TODO group things by contour size
-#TODO store a data array in the method that joseph recommended
+A look at computer vision & video games
 
+Background subtraction in video games
+
+"""
 import math
 import io
 import numpy as np
@@ -29,6 +30,8 @@ def main():
     live  = {}
     dead = {}
 
+    lastSeen = None
+
     prevEdge = None
     currEdge = None
 
@@ -49,9 +52,16 @@ def main():
     prevF = None
     currF = None
 
+    scrollX = 0
+    scrollY = 0
+
+    netX = 0
+    netY = 0
+
+    slicedFrame = None
+
     #offset dictionary
     offVals = {}
-
     while (True):
 
         ret, frame = video.read()
@@ -65,7 +75,7 @@ def main():
         #increment frameCount
         frameC+=1
 
-        if (frameC < 30):
+        if (frameC < 500):
             continue
         elif (frameC >700):
             break
@@ -79,21 +89,16 @@ def main():
         elif (frameC>500):
             assert len(live)>=1, "frameCount"+ str(frameC) + " counts " + str( len(live) )
 
+        slicedFrame = slice(lastSeen, frame)
+
         #update the currFrame
         currF = frame
-
-        #update scrolling (prevF, currF) return values for deltaX, deltaY
-        #update scrollX, scrollY
-        #making sure edge detection + alignment
-        #pass in dX, dY into findBoxes to make sure correct rectangles are subtracted
-        #in keepbox, pass in dX, dY to make sure the current frame is compared to the previous frame
-        #offets scene by dx,dy instead of append; decide what type of coordinates are being used
 
         #get the two boxes in the current frame that we're looking at
         if frameC > 0 and currF is not None:
 
             #recieve an array of all the box tuples we found due to a difference in two frames
-            boxes = findBoxes(prevF, currF, frameC, trackID)
+            boxes = findBoxes(prevF, currF, frameC, trackID, scrollX, scrollY)
 
             #print( "boxes " + str(boxes) )
 
@@ -111,7 +116,7 @@ def main():
             #print("last seen box " + str(lastSeen) )
 
             #make sure we should keep
-            if keepBox (lastSeen, boxes, prevF, currF):
+            if keepBox (lastSeen, boxes, prevF, currF, scrollX, scrollY):
 
                 #
                 boxes.append(lastSeen)
@@ -165,10 +170,9 @@ def main():
 
             #print( "live" + str(live) )
 
-            #visualise(currF, live)
             newFrame = visualise(np.copy(frame), live)
 
-            cv2.imshow("Object Paths", newFrame )
+            #cv2.imshow("Object Paths", newFrame )
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -177,10 +181,36 @@ def main():
             currEdge = getEdgeFrame(frame)
             currPix = getCurrPix(currEdge)
 
+            #TODO get a neighboring bounds from the list of pixels we could use try to register a color field
+            #work on new and color colors based on edges
+            #pick from edges and compare colors instead of edges
+            #opencv template match for the neighborhood image (slightly larger than the color field area) (add x and sub y a bit)
+            #sum up the color field to a big result that replaces the offset dictionary with bias towards the original
+            #replace the comparePixels, slice to get template, and slice to get bigger area
+            #for y,x in currPix
+            #template += templatematch results
+
             #compare it to the prevPix if we have that then do the thing (see bottom)
             if ( prevEdge is not None):
+
                 offVals = comparePixels(prevEdge, currPix)
-                print ("offVals " + str(offVals) )
+
+                #print ("offVals " + str(offVals) )
+                #scrollY, scrollX = offVals
+
+                #offVals was a tuple
+                #scrollX, scrollY = offVals
+
+                #netX += offVals[0]
+                #netY += offVals[1]
+
+                #print ( "netX  " + str(netX) + "  netY  " + str(netY) )
+
+                #sliceFrame(currF)
+
+                matchIt(currPix, prevF, currF)
+
+
 
             #update the previous pixel values
             prevPix = currPix
@@ -200,8 +230,9 @@ def main():
     #print("dead contents after everything... " + str(dead))
 """
 Handles the initial video movement detection via frame differences
+offset new contours by scrollx, scrolly
 """
-def findBoxes(frame1, frame2, frameC, trackID):
+def findBoxes(frame1, frame2, frameC, trackID, dx, dy):
 
     firstImg = cv2.bilateralFilter(frame1, 5, 175, 175)
 
@@ -225,7 +256,7 @@ def findBoxes(frame1, frame2, frameC, trackID):
     #find the 'strong' edges of the image
     edge_detected_image = cv2.Canny(bilateral_filtered_image, 75, 200)
 
-    cv2.imshow('Edge', edge_detected_image)
+    #cv2.imshow('Edge', edge_detected_image)
 
     #find difference
     deltaF = cv2.absdiff(prevFrame, edge_detected_image)
@@ -234,7 +265,7 @@ def findBoxes(frame1, frame2, frameC, trackID):
     # find contours
     deltaF = cv2.dilate(deltaF, None, iterations=2)
 
-    cv2.imshow("frame difference", deltaF)
+    #cv2.imshow("frame difference", deltaF)
 
     # https://docs.opencv.org/2.4/modules/imgproc/doc/structural_analysis_and_shape_descriptors.html?highlight=findcontours#findcontours
     # findContours(image, retrieval mode, contour approximation)
@@ -256,12 +287,12 @@ def findBoxes(frame1, frame2, frameC, trackID):
             #apply a bounding box over everything moving
             (x, y, w, h) = cv2.boundingRect(c)
 
-            results.append( (x,y,w,h) )
+            results.append( (x-dx,y-dy,w,h) )
 
     return results
 
 #checks if the main loop should continue
-def keepBox(oldB, newB, prevF, currF):
+def keepBox(oldB, newB, prevF, currF, dx, dy):
 
     amount = 25500
 
@@ -275,13 +306,14 @@ def keepBox(oldB, newB, prevF, currF):
 
         #print("oldB[1] " + str(oldB[1]) + "dist " + str(dist) )
 
-        if  dist <=4 or box[1]:
+        #
+        if  dist <= (abs(dx)+abs(dy)):
             return False
 
     #compares content of the pixels
     (x,y,w,h) = oldB
-    oldPix = prevF[y:y+h, x:x+w]
-    newPix = currF[y:y+h, x:x+w]
+    oldPix = prevF[y:y+h, x:x+w] #
+    newPix = currF[y:y+h, x:x+w] #
 
     #print("cv2.absdiff(newPix, oldPix).sum() : " + str(cv2.absdiff(newPix, oldPix).sum()) )
 
@@ -345,7 +377,11 @@ def biMatch (live, boxes):
 
     return match
 
+
+
 #TODO ignore the bush object
+#TODO use simm to compare the screen and if a threshold value falls below x
+
 
 #thing corresponds to the key, 0, 1, 2, 3 , 4, etc
 # points[thing] contains (frame first seen, all points we have for now)
@@ -382,17 +418,15 @@ def visualise(frame, points):
 # if the image is scrolling up, use slicing to cut away image parts that don't overlap, that is don't compare
 # pieces of the image that wasn't originally in the old image frame
 
-#slice by new[2:, 0], old[0:h-2, 0:-1] if the offeset is (0,2)
-
 #creates and returns an edge frame
 def getEdgeFrame(frame):
 
     #smooths the image with sharper edges - better for detailed super metroid
-    filtered = cv2.bilateralFilter(frame, 5, 175, 175)
+    #filtered = cv2.bilateralFilter(frame, 5, 175, 175)
 
     #find the 'strong' edges of the image
-    edgy = cv2.Canny(filtered, 75, 200)
-
+    #edgy = cv2.Canny(filtered, 75, 200)
+    edgy = cv2.Canny(frame, 75, 200)
     #
     #print ("pixelValues   ::" + str(pixelValues))
 
@@ -404,40 +438,94 @@ def getEdgeFrame(frame):
 def getCurrPix(edge):
 
     z=0
-    pixNum = 100
+
+    pixNum = 500
+
+    bounds=50
 
     #
     pixelValues = []
 
     #find the pieces that are white colored
-    x,y = np.where(edge == 255) #coordinate in the matrix
+    y,x = np.where(edge == 255) #coordinate in the matrix
 
-    #picks ten random white pixel
+    #length of # x
+    #print ("len(x) " + str(len(x)))
+
+    #picks ten random white pixel within a certain area
     while z<pixNum:
+
         i = np.random.randint(len(x))
-        pixelValues.append( (x[i], y[i]) ) #keep the pos
-        z+=1
+        if bounds < x[i] < edge.shape[1]-bounds and bounds < y[i] < edge.shape[0]-bounds:
+            pixelValues.append( (x[i],y[i]) )
+            #print ( "pixel coords " + str( (y[i],x[i]) ) )
+            z+=1
+
+    #print ("pixelValues " + str(pixelValues) )
 
     return pixelValues
 
+#TODO get a neighboring bounds from the list of pixels we could use try to register a color field
+#work on new and color colors based on edges
+#pick from edges and compare colors instead of edges
+#opencv template match for the neighborhood image (slightly larger than the color field area) (add x and sub y a bit)
+#sum up the color field to a big result that replaces the offset dictionary with bias towards the original
+#replace the comparePixels, slice to get template, and slice to get bigger area
+#for y,x in currPix
+#template += templatematch results
+def matchIt(pickPix, prevFrame, currFrame):
+
+    size = 4
+    winSize = 8
+
+    #Each position denotes a matching offset
+    match = np.zeros(shape=(9,9))
+
+    #for the (y,x) in pixel
+    for pixel in pickPix:
+
+        #a piece of the previous Frame
+        thisTemp = prevFrame[pixel[1]-size:pixel[1]+size, pixel[0]-size:pixel[0]+size]
+
+        #a piece from the current frame
+        window = currFrame[pixel[1]-winSize:pixel[1]+winSize, pixel[0]-winSize:pixel[0]+winSize ]
+
+        match += cv2.matchTemplate(window, thisTemp, cv2.TM_SQDIFF_NORMED)
+
+        print ("contents of match " + str(match) )
+
+        cv2.imshow("matched", match)
+
+    #get the min_loc of the added up pieces
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(match)
+
+    #print ("min_val " + str(min_loc))
+    print ("min_loc " + str(min_loc))
+
+    #
+    return min_loc
+
 #look for an x,y offest that works the best for all of the points
-#offset kepy by dx, dy
-#offset new contous by x,y
-#dictionary with offset in 2D { (-2,-2):0, (-2,1):0, (0,0):0 } inside compare to find
+#offset kept by dx, dy
+#offset new contours by x,y
+#dictionary with offset in 2D { (-2,-2):0, (-2,1):0, (0,0):0 } inside comparePixls
 #in keepbox might need to offset the boxes we find by xscroll, yscroll
 
+
 #takes the previous edge detected frame and the last pixel values we took
+#finds the offset with the largest count
 def comparePixels(prevEdge, currPix):
 
-    #point being compared atm
+    #point being compared at the moment
     checkPoint = None
 
     #cv2.imshow("passed into comparepixels", prevEdge)
     #
-    offset = { (-2,2):0, (-2,1):0, (-2,0):0, (-1,2):0, (-1,1):0,(-1,0):0, (0,0):0, (0,1):0, (0,2):0, (0,-1):0, (0,-2):0 }
 
-    #get the edge pixels in the last frame and compare them to the edge pixels we picked in the current one
-    #x,y = np.where(prevEdge == 255)
+    offset = {}
+    for xi in range(-6, 6):
+        for yi in range(-6, 6):
+            offset[(yi,xi)] = 0
 
     #
     #print ( "edge " + str(prevEdge) )
@@ -452,23 +540,62 @@ def comparePixels(prevEdge, currPix):
 
             checkPoint = np.add(currPoint, dir) #ie point (100,100) gets added by (-2,-2)
 
-            #make sure the tuple does not point offscreen checkPoint[0] < 506 and checkPoint[1] < 506
-            if (checkPoint[0] <= 505 and checkPoint[1] <= 505):
+            #print ("checkpoint" + str(checkPoint))
 
-                checkTuple = (checkPoint[0], checkPoint[1])
+            #print ( str(checkPoint) )
 
-                print ( str(checkPoint) )
+            #if the offsetted point is white
+            if (prevEdge[ (checkPoint[0], checkPoint[1]) ]) == 255:
 
-                #if the offsetted point is white AND it is not offscreen
-                if (prevEdge[ (checkPoint[0], checkPoint[1]) ]) == 255:
+                #increment the value inside the dictionary
+                offset[dir] +=1
 
-                    #increment the value inside the dictionary
-                    offset[dir] +=1
+                #break
 
-                    break
+    maxOff = maxOffset(offset)
+    #print ("offset contents" + str(offset))
+    #print("maxOff" + str(maxOff) )
 
     #return dictionary of offset values to check scrolling
-    return offset
+    #return offset
+    return maxOff
+
+"""
+find key with max val
+"""
+def maxOffset(d):
+
+     #print ("Offset dictionary " + str(d) )
+
+     highest = max(d.values())
+
+     smOffset = None
+
+     #loop through the offset dictionary (k is tuple, v is value)
+     for k, v in d.items() :
+
+        #print ("k " + str(k) )
+
+        #
+        if v == highest:
+
+            #
+            if smOffset is None:
+
+                smOffset = k
+
+            #choose a smaller offset (sum of absolute value of dy and dx) if there's a tie
+            elif ( ( abs(k[0])+ abs(k[1]) ) < (abs(smOffset[0])+abs(smOffset[1])) ):
+
+                #print ("( abs(k[0])+ abs(k[1]) " + str( abs(k[0])+ abs(k[1]) ) )
+                #print ("( abs(smOffset[0])+abs(smOffset[1]) ) " + str( abs(smOffset[0])+abs(smOffset[1]) ))
+
+                smOffset = k
+
+     print ("smOffset " + str(smOffset) )
+
+     return smOffset
+
 
 #function calls
 main()
