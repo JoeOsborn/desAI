@@ -60,8 +60,11 @@ def main():
 
     slicedFrame = None
 
+    movedBy = 0
+
     #offset dictionary
     offVals = {}
+
     while (True):
 
         ret, frame = video.read()
@@ -208,9 +211,7 @@ def main():
 
                 #sliceFrame(currF)
 
-                matchIt(currPix, prevF, currF)
-
-
+                movedBy = matchIt(currPix, prevF, currF)
 
             #update the previous pixel values
             prevPix = currPix
@@ -473,10 +474,13 @@ def getCurrPix(edge):
 #replace the comparePixels, slice to get template, and slice to get bigger area
 #for y,x in currPix
 #template += templatematch results
+#find the min loc from all the matches
 def matchIt(pickPix, prevFrame, currFrame):
 
     size = 4
     winSize = 8
+    movedVal = (0,0)
+    offset = 4
 
     #Each position denotes a matching offset
     match = np.zeros(shape=(9,9))
@@ -492,7 +496,7 @@ def matchIt(pickPix, prevFrame, currFrame):
 
         match += cv2.matchTemplate(window, thisTemp, cv2.TM_SQDIFF_NORMED)
 
-        print ("contents of match " + str(match) )
+        #print ("contents of match " + str(match) )
 
         cv2.imshow("matched", match)
 
@@ -500,10 +504,15 @@ def matchIt(pickPix, prevFrame, currFrame):
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(match)
 
     #print ("min_val " + str(min_loc))
-    print ("min_loc " + str(min_loc))
+    #print ("min_loc " + str(min_loc))
+
+    movedVal = (min_loc[0]-offset, min_loc[1]-offset)
+
+    print ( "moved amount" + str(movedVal) )
 
     #
-    return min_loc
+    return movedVal
+
 
 #look for an x,y offest that works the best for all of the points
 #offset kept by dx, dy
