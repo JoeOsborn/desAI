@@ -65,6 +65,8 @@ def main():
     #offset dictionary
     offVals = {}
 
+    #imgNum = 0
+
     while (True):
 
         ret, frame = video.read()
@@ -174,6 +176,12 @@ def main():
             #print( "live" + str(live) )
 
             newFrame = visualise(np.copy(frame), live)
+            #imgNum = 0
+
+            #cv2.imwrite("./images/"+str(imgNum)+".jpg" ,newFrame)
+            #imgNum+=1
+
+            #cv2.imshow("ogframe", frame )
 
             #cv2.imshow("Object Paths", newFrame )
 
@@ -485,6 +493,8 @@ def matchIt(pickPix, prevFrame, currFrame):
     #Each position denotes a matching offset
     match = np.zeros(shape=(9,9))
 
+    currMatch = match
+
     #for the (y,x) in pixel
     for pixel in pickPix:
 
@@ -494,9 +504,11 @@ def matchIt(pickPix, prevFrame, currFrame):
         #a piece from the current frame
         window = currFrame[pixel[1]-winSize:pixel[1]+winSize, pixel[0]-winSize:pixel[0]+winSize ]
 
-        match += cv2.matchTemplate(window, thisTemp, cv2.TM_SQDIFF_NORMED)
+        cv2.imshow("thisTemp", thisTemp)
 
-        #print ("contents of match " + str(match) )
+        currMatch = cv2.matchTemplate(window, thisTemp, cv2.TM_SQDIFF_NORMED)
+
+        match += currMatch
 
         cv2.imshow("matched", match)
 
